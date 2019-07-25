@@ -20,8 +20,6 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.KeyEvent;
-import android.view.WindowManager;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -29,8 +27,6 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.otaliastudios.cameraview.CameraView;
 import com.otaliastudios.cameraview.frame.FrameProcessor;
-
-import timber.log.Timber;
 
 public abstract class CameraActivity extends AppCompatActivity implements FrameProcessor {
 
@@ -40,14 +36,9 @@ public abstract class CameraActivity extends AppCompatActivity implements FrameP
 
     private CameraView cameraView;
 
-    private boolean debug = false;
-
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
-        Timber.d("onCreate " + this);
-        super.onCreate(null);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
+        super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_stylize);
 
         if (hasPermission()) {
@@ -59,7 +50,6 @@ public abstract class CameraActivity extends AppCompatActivity implements FrameP
 
     @Override
     public void onDestroy() {
-        Timber.d("onDestroy " + this);
         cameraView.clearFrameProcessors();
         super.onDestroy();
     }
@@ -101,10 +91,6 @@ public abstract class CameraActivity extends AppCompatActivity implements FrameP
         cameraView.addFrameProcessor(this);
     }
 
-    public boolean isDebug() {
-        return debug;
-    }
-
     public void requestRender() {
         runOnUiThread(new Runnable() {
             @Override
@@ -122,15 +108,5 @@ public abstract class CameraActivity extends AppCompatActivity implements FrameP
         if (overlay != null) {
             overlay.addCallback(callback);
         }
-    }
-
-    @Override
-    public boolean onKeyDown(final int keyCode, final KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-            debug = !debug;
-            requestRender();
-            return true;
-        }
-        return super.onKeyDown(keyCode, event);
     }
 }

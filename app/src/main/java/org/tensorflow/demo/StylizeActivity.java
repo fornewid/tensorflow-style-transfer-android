@@ -26,11 +26,8 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
-import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.util.Size;
-import android.util.TypedValue;
 import android.view.Display;
 import android.view.MotionEvent;
 import android.view.View;
@@ -51,14 +48,11 @@ import com.otaliastudios.cameraview.frame.Frame;
 import org.jetbrains.annotations.NotNull;
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 import org.tensorflow.demo.OverlayView.DrawCallback;
-import org.tensorflow.demo.env.BorderedText;
 import org.tensorflow.demo.env.ImageUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import timber.log.Timber;
 
@@ -78,8 +72,6 @@ public class StylizeActivity extends CameraActivity {
     // Whether to actively manipulate non-selected sliders so that sum of activations always appears
     // to be 1.0. The actual style input tensor will be normalized to sum to 1.0 regardless.
     private static final boolean NORMALIZE_SLIDERS = true;
-
-    private static final float TEXT_SIZE_DIP = 12;
 
     private static final int[] SIZES = {128, 192, 256, 384, 512, 720};
 
@@ -106,10 +98,6 @@ public class StylizeActivity extends CameraActivity {
 
     private Matrix frameToCropTransform;
     private Matrix cropToFrameTransform;
-
-    private BorderedText borderedText;
-
-    private long lastProcessingTimeMs;
 
     private int lastOtherStyle = 1;
 
@@ -305,12 +293,6 @@ public class StylizeActivity extends CameraActivity {
     }
 
     private void setupView() {
-        final float textSizePx =
-                TypedValue.applyDimension(
-                        TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
-        borderedText = new BorderedText(textSizePx);
-        borderedText.setTypeface(Typeface.MONOSPACE);
-
         final Display display = getWindowManager().getDefaultDisplay();
         final int screenOrientation = display.getRotation();
 
@@ -439,9 +421,7 @@ public class StylizeActivity extends CameraActivity {
 
         cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
 
-        final long startTime = SystemClock.uptimeMillis();
         stylizeImage(croppedBitmap);
-        lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
         textureCopyBitmap = Bitmap.createBitmap(croppedBitmap);
 
@@ -464,7 +444,7 @@ public class StylizeActivity extends CameraActivity {
         inferenceInterface.feed(STYLE_NODE, styleVals, NUM_STYLES);
 
         // Execute the output node's dependency sub-graph.
-        inferenceInterface.run(new String[]{OUTPUT_NODE}, isDebug());
+        inferenceInterface.run(new String[]{OUTPUT_NODE}, false);
 
         // Copy the data from TensorFlow back into our array.
         inferenceInterface.fetch(OUTPUT_NODE, floatValues);
@@ -491,41 +471,5 @@ public class StylizeActivity extends CameraActivity {
             matrix.postScale(scaleFactor, scaleFactor);
             canvas.drawBitmap(texture, matrix, new Paint());
         }
-
-        if (!isDebug()) {
-            return;
-        }
-
-        final Bitmap copy = cropCopyBitmap;
-        if (copy == null) {
-            return;
-        }
-
-        canvas.drawColor(0x55000000);
-
-        final Matrix matrix = new Matrix();
-        final float scaleFactor = 2;
-        matrix.postScale(scaleFactor, scaleFactor);
-        matrix.postTranslate(
-                canvas.getWidth() - copy.getWidth() * scaleFactor,
-                canvas.getHeight() - copy.getHeight() * scaleFactor);
-        canvas.drawBitmap(copy, matrix, new Paint());
-
-        final List<String> lines = new ArrayList<>();
-
-        // Add these three lines:
-        final String[] statLines = inferenceInterface.getStatString().split("\n");
-        Collections.addAll(lines, statLines);
-        lines.add("");
-
-        lines.add("Frame: " + previewWidth + "x" + previewHeight);
-        lines.add("Crop: " + copy.getWidth() + "x" + copy.getHeight());
-        lines.add("View: " + canvas.getWidth() + "x" + canvas.getHeight());
-        lines.add("Rotation: " + sensorOrientation);
-        lines.add("Inference time: " + lastProcessingTimeMs + "ms");
-        lines.add("Desired size: " + desiredSize);
-        lines.add("Initialized size: " + initializedSize);
-
-        borderedText.drawText(canvas, 10, canvas.getHeight() - 10, lines);
     }
 }
