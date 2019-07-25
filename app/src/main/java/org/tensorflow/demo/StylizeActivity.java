@@ -27,11 +27,8 @@ import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.graphics.Typeface;
-import android.media.Image;
-import android.media.ImageReader;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.os.Trace;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.Display;
@@ -45,8 +42,11 @@ import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
 
+import androidx.annotation.NonNull;
+
 import com.google.firebase.ml.vision.common.FirebaseVisionImage;
 import com.google.firebase.ml.vision.common.FirebaseVisionImageMetadata;
+import com.otaliastudios.cameraview.frame.Frame;
 
 import org.jetbrains.annotations.NotNull;
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
@@ -82,8 +82,6 @@ public class StylizeActivity extends CameraActivity {
     private static final float TEXT_SIZE_DIP = 12;
 
     private static final int[] SIZES = {128, 192, 256, 384, 512, 720};
-
-    private static final Size DESIRED_PREVIEW_SIZE = new Size(1280, 720);
 
     // Start at a medium size, but let the user step up through smaller sizes so they don't get
     // immediately stuck processing a large image.
@@ -166,16 +164,7 @@ public class StylizeActivity extends CameraActivity {
     @Override
     public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-    }
-
-    @Override
-    protected int getLayoutId() {
-        return R.layout.camera_connection_fragment_stylize;
-    }
-
-    @Override
-    protected Size getDesiredPreviewFrameSize() {
-        return DESIRED_PREVIEW_SIZE;
+        setupView();
     }
 
     public static Bitmap getBitmapFromAsset(final Context context, final String filePath) {
@@ -315,25 +304,22 @@ public class StylizeActivity extends CameraActivity {
         }
     }
 
-    @Override
-    public void onPreviewSizeChosen(final Size size, final int rotation) {
+    private void setupView() {
         final float textSizePx =
                 TypedValue.applyDimension(
                         TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
         borderedText = new BorderedText(textSizePx);
         borderedText.setTypeface(Typeface.MONOSPACE);
 
-        previewWidth = size.getWidth();
-        previewHeight = size.getHeight();
-
-        inferenceInterface = new TensorFlowInferenceInterface(getAssets(), MODEL_FILE);
-
         final Display display = getWindowManager().getDefaultDisplay();
         final int screenOrientation = display.getRotation();
 
-        Timber.i("Sensor orientation: %d, Screen orientation: %d", rotation, screenOrientation);
+        Timber.i("Sensor orientation: %d, Screen orientation: %d", 0, screenOrientation);
 
-        sensorOrientation = rotation + screenOrientation;
+        sensorOrientation = screenOrientation;
+
+        inferenceInterface = new TensorFlowInferenceInterface(getAssets(), MODEL_FILE);
+
 
         addCallback(new DrawCallback() {
             @Override
@@ -348,6 +334,22 @@ public class StylizeActivity extends CameraActivity {
         grid.setOnTouchListener(gridTouchAdapter);
 
         setStyle(adapter.items[0], 1.0f);
+    }
+
+    @Override
+    public void process(@NonNull Frame frame) {
+        previewWidth = frame.getSize().getWidth();
+        previewHeight = frame.getSize().getHeight();
+
+        Bitmap bitmap = FirebaseVisionImage
+                .fromByteArray(frame.getData(), new FirebaseVisionImageMetadata.Builder()
+                        .setFormat(FirebaseVisionImageMetadata.IMAGE_FORMAT_NV21)
+                        .setWidth(frame.getSize().getWidth())
+                        .setHeight(frame.getSize().getHeight())
+                        .setRotation(FirebaseVisionImageMetadata.ROTATION_90)
+                        .build())
+                .getBitmap();
+        onImageAvailable(bitmap);
     }
 
     private void setStyle(final ImageSlider slider, final float value) {
@@ -408,77 +410,43 @@ public class StylizeActivity extends CameraActivity {
         }
     }
 
-    @Override
-    public void onImageAvailable(final ImageReader reader) {
-        Image image = null;
-        final Bitmap rgbFrameBitmap;
-        try {
-            image = reader.acquireLatestImage();
+    private void onImageAvailable(final Bitmap bitmap) {
+        if (computing) return;
 
-            if (image == null) {
-                return;
-            }
+        if (desiredSize != initializedSize) {
+            Timber.i("Initializing at size preview size %dx%d, stylize size %d",
+                    previewWidth, previewHeight, desiredSize);
+            croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Bitmap.Config.ARGB_8888);
 
-            if (computing) {
-                image.close();
-                return;
-            }
+            frameToCropTransform =
+                    ImageUtils.getTransformationMatrix(
+                            previewWidth, previewHeight,
+                            desiredSize, desiredSize,
+                            sensorOrientation, true);
 
-            if (desiredSize != initializedSize) {
-                Timber.i("Initializing at size preview size %dx%d, stylize size %d",
-                        previewWidth, previewHeight, desiredSize);
-                croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Bitmap.Config.ARGB_8888);
+            cropToFrameTransform = new Matrix();
+            frameToCropTransform.invert(cropToFrameTransform);
 
-                frameToCropTransform =
-                        ImageUtils.getTransformationMatrix(
-                                previewWidth, previewHeight,
-                                desiredSize, desiredSize,
-                                sensorOrientation, true);
-
-                cropToFrameTransform = new Matrix();
-                frameToCropTransform.invert(cropToFrameTransform);
-
-                intValues = new int[desiredSize * desiredSize];
-                floatValues = new float[desiredSize * desiredSize * 3];
-                initializedSize = desiredSize;
-            }
-
-            computing = true;
-
-            rgbFrameBitmap = FirebaseVisionImage
-                    .fromMediaImage(image, FirebaseVisionImageMetadata.ROTATION_0)
-                    .getBitmap();
-
-            image.close();
-        } catch (final Exception e) {
-            if (image != null) {
-                image.close();
-            }
-            Timber.e(e, "Exception!");
-            Trace.endSection();
-            return;
+            intValues = new int[desiredSize * desiredSize];
+            floatValues = new float[desiredSize * desiredSize * 3];
+            initializedSize = desiredSize;
         }
 
+        computing = true;
+
         final Canvas canvas = new Canvas(croppedBitmap);
-        canvas.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
+        canvas.drawBitmap(bitmap, frameToCropTransform, null);
 
-        runInBackground(new Runnable() {
-            @Override
-            public void run() {
-                cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
+        cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
 
-                final long startTime = SystemClock.uptimeMillis();
-                stylizeImage(croppedBitmap);
-                lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
+        final long startTime = SystemClock.uptimeMillis();
+        stylizeImage(croppedBitmap);
+        lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
-                textureCopyBitmap = Bitmap.createBitmap(croppedBitmap);
+        textureCopyBitmap = Bitmap.createBitmap(croppedBitmap);
 
-                requestRender();
-                computing = false;
-            }
-        });
-
-        Trace.endSection();
+        requestRender();
+        computing = false;
     }
 
     private void stylizeImage(final Bitmap bitmap) {

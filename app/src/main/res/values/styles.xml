@@ -14,5 +14,10 @@
  limitations under the License.
 -->
 <resources>
-    <style name="MaterialTheme" parent="android:Theme.Material.Light.NoActionBar.Fullscreen" />
+
+    <style name="MaterialTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+
 </resources>
