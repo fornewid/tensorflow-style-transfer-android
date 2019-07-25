@@ -20,7 +20,6 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.Fragment;
 import android.content.pm.PackageManager;
-import android.media.Image.Plane;
 import android.media.ImageReader.OnImageAvailableListener;
 import android.os.Build;
 import android.os.Bundle;
@@ -30,8 +29,6 @@ import android.util.Size;
 import android.view.KeyEvent;
 import android.view.WindowManager;
 import android.widget.Toast;
-
-import java.nio.ByteBuffer;
 
 import timber.log.Timber;
 
@@ -167,19 +164,6 @@ public abstract class CameraActivity extends Activity implements OnImageAvailabl
                 .beginTransaction()
                 .replace(R.id.container, fragment)
                 .commit();
-    }
-
-    protected void fillBytes(final Plane[] planes, final byte[][] yuvBytes) {
-        // Because of the variable row stride it's not possible to know in
-        // advance the actual necessary dimensions of the yuv planes.
-        for (int i = 0; i < planes.length; ++i) {
-            final ByteBuffer buffer = planes[i].getBuffer();
-            if (yuvBytes[i] == null) {
-                Timber.d("Initializing buffer %d at size %d", i, buffer.capacity());
-                yuvBytes[i] = new byte[buffer.capacity()];
-            }
-            buffer.get(yuvBytes[i]);
-        }
     }
 
     public boolean isDebug() {

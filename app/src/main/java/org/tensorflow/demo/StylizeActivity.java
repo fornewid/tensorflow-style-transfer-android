@@ -19,7 +19,6 @@ package org.tensorflow.demo;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
-import android.graphics.Bitmap.Config;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -29,9 +28,7 @@ import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.media.Image;
-import android.media.Image.Plane;
 import android.media.ImageReader;
-import android.media.ImageReader.OnImageAvailableListener;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -47,6 +44,9 @@ import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
+
+import com.google.firebase.ml.vision.common.FirebaseVisionImage;
+import com.google.firebase.ml.vision.common.FirebaseVisionImageMetadata;
 
 import org.jetbrains.annotations.NotNull;
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
@@ -66,7 +66,7 @@ import timber.log.Timber;
  * Sample activity that stylizes the camera preview according to "A Learned Representation For
  * Artistic Style" (https://arxiv.org/abs/1610.07629)
  */
-public class StylizeActivity extends CameraActivity implements OnImageAvailableListener {
+public class StylizeActivity extends CameraActivity {
 
     private TensorFlowInferenceInterface inferenceInterface;
     private static final String MODEL_FILE = "file:///android_asset/stylize_quantized.pb";
@@ -80,8 +80,6 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
     private static final boolean NORMALIZE_SLIDERS = true;
 
     private static final float TEXT_SIZE_DIP = 12;
-
-    private static final boolean DEBUG_MODEL = false;
 
     private static final int[] SIZES = {128, 192, 256, 384, 512, 720};
 
@@ -97,16 +95,11 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
 
     private int previewWidth = 0;
     private int previewHeight = 0;
-    private byte[][] yuvBytes;
-    private int[] rgbBytes = null;
-    private Bitmap rgbFrameBitmap = null;
     private Bitmap croppedBitmap = null;
 
     private final float[] styleVals = new float[NUM_STYLES];
     private int[] intValues;
     private float[] floatValues;
-
-    private int frameNum = 0;
 
     private Bitmap cropCopyBitmap;
     private Bitmap textureCopyBitmap;
@@ -150,12 +143,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
                         final Rect rect = new Rect();
                         slider.getHitRect(rect);
 
-                        final float newSliderVal =
-                                (float)
-                                        Math.min(
-                                                1.0,
-                                                Math.max(
-                                                        0.0, 1.0 - (event.getY() - slider.getTop()) / slider.getHeight()));
+                        final float newSliderVal = (float) Math.min(1.0, Math.max(0.0, 1.0 - (event.getY() - slider.getTop()) / slider.getHeight()));
 
                         setStyle(slider, newSliderVal);
                     }
@@ -198,7 +186,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
             final InputStream inputStream = assetManager.open(filePath);
             bitmap = BitmapFactory.decodeStream(inputStream);
         } catch (final IOException e) {
-            Timber.e("Error opening bitmap!", e);
+            Timber.e(e, "Error opening bitmap!");
         }
 
         return bitmap;
@@ -423,7 +411,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
     @Override
     public void onImageAvailable(final ImageReader reader) {
         Image image = null;
-
+        final Bitmap rgbFrameBitmap;
         try {
             image = reader.acquireLatestImage();
 
@@ -437,12 +425,9 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
             }
 
             if (desiredSize != initializedSize) {
-                Timber.i(
-                        "Initializing at size preview size %dx%d, stylize size %d",
+                Timber.i("Initializing at size preview size %dx%d, stylize size %d",
                         previewWidth, previewHeight, desiredSize);
-                rgbBytes = new int[previewWidth * previewHeight];
-                rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Config.ARGB_8888);
-                croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Config.ARGB_8888);
+                croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Bitmap.Config.ARGB_8888);
 
                 frameToCropTransform =
                         ImageUtils.getTransformationMatrix(
@@ -453,8 +438,6 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
                 cropToFrameTransform = new Matrix();
                 frameToCropTransform.invert(cropToFrameTransform);
 
-                yuvBytes = new byte[3][];
-
                 intValues = new int[desiredSize * desiredSize];
                 floatValues = new float[desiredSize * desiredSize * 3];
                 initializedSize = desiredSize;
@@ -462,25 +445,9 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
 
             computing = true;
 
-            Trace.beginSection("imageAvailable");
-
-            final Plane[] planes = image.getPlanes();
-            fillBytes(planes, yuvBytes);
-
-            final int yRowStride = planes[0].getRowStride();
-            final int uvRowStride = planes[1].getRowStride();
-            final int uvPixelStride = planes[1].getPixelStride();
-
-            ImageUtils.convertYUV420ToARGB8888(
-                    yuvBytes[0],
-                    yuvBytes[1],
-                    yuvBytes[2],
-                    previewWidth,
-                    previewHeight,
-                    yRowStride,
-                    uvRowStride,
-                    uvPixelStride,
-                    rgbBytes);
+            rgbFrameBitmap = FirebaseVisionImage
+                    .fromMediaImage(image, FirebaseVisionImageMetadata.ROTATION_0)
+                    .getBitmap();
 
             image.close();
         } catch (final Exception e) {
@@ -492,7 +459,6 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
             return;
         }
 
-        rgbFrameBitmap.setPixels(rgbBytes, 0, previewWidth, 0, 0, previewWidth, previewHeight);
         final Canvas canvas = new Canvas(croppedBitmap);
         canvas.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
 
@@ -516,30 +482,13 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
     }
 
     private void stylizeImage(final Bitmap bitmap) {
-        ++frameNum;
         bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
 
-        if (DEBUG_MODEL) {
-            // Create a white square that steps through a black background 1 pixel per frame.
-            final int centerX = (frameNum + bitmap.getWidth() / 2) % bitmap.getWidth();
-            final int centerY = bitmap.getHeight() / 2;
-            final int squareSize = 10;
-            for (int i = 0; i < intValues.length; ++i) {
-                final int x = i % bitmap.getWidth();
-                final int y = i / bitmap.getHeight();
-                final float val =
-                        Math.abs(x - centerX) < squareSize && Math.abs(y - centerY) < squareSize ? 1.0f : 0.0f;
-                floatValues[i * 3] = val;
-                floatValues[i * 3 + 1] = val;
-                floatValues[i * 3 + 2] = val;
-            }
-        } else {
-            for (int i = 0; i < intValues.length; ++i) {
-                final int val = intValues[i];
-                floatValues[i * 3] = ((val >> 16) & 0xFF) / 255.0f;
-                floatValues[i * 3 + 1] = ((val >> 8) & 0xFF) / 255.0f;
-                floatValues[i * 3 + 2] = (val & 0xFF) / 255.0f;
-            }
+        for (int i = 0; i < intValues.length; ++i) {
+            final int val = intValues[i];
+            floatValues[i * 3] = ((val >> 16) & 0xFF) / 255.0f;
+            floatValues[i * 3 + 1] = ((val >> 8) & 0xFF) / 255.0f;
+            floatValues[i * 3 + 2] = (val & 0xFF) / 255.0f;
         }
 
         // Copy the input data into TensorFlow.
@@ -568,12 +517,9 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
         final Bitmap texture = textureCopyBitmap;
         if (texture != null) {
             final Matrix matrix = new Matrix();
-            final float scaleFactor =
-                    DEBUG_MODEL
-                            ? 4.0f
-                            : Math.min(
-                            (float) canvas.getWidth() / texture.getWidth(),
-                            (float) canvas.getHeight() / texture.getHeight());
+            final float scaleFactor = Math.min(
+                    (float) canvas.getWidth() / texture.getWidth(),
+                    (float) canvas.getHeight() / texture.getHeight());
             matrix.postScale(scaleFactor, scaleFactor);
             canvas.drawBitmap(texture, matrix, new Paint());
         }
