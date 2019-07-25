@@ -15,12 +15,7 @@ limitations under the License.
 
 package org.tensorflow.demo.env;
 
-import android.graphics.Bitmap;
 import android.graphics.Matrix;
-import android.os.Environment;
-
-import java.io.File;
-import java.io.FileOutputStream;
 
 import timber.log.Timber;
 
@@ -34,46 +29,6 @@ public class ImageUtils {
             System.loadLibrary("tensorflow_demo");
         } catch (UnsatisfiedLinkError e) {
             Timber.w("Native library not found, native RGB -> YUV conversion may be unavailable.");
-        }
-    }
-
-    /**
-     * Saves a Bitmap object to disk for analysis.
-     *
-     * @param bitmap The bitmap to save.
-     */
-    public static void saveBitmap(final Bitmap bitmap) {
-        saveBitmap(bitmap, "preview.png");
-    }
-
-    /**
-     * Saves a Bitmap object to disk for analysis.
-     *
-     * @param bitmap   The bitmap to save.
-     * @param filename The location to save the bitmap to.
-     */
-    public static void saveBitmap(final Bitmap bitmap, final String filename) {
-        final String root =
-                Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "tensorflow";
-        Timber.i("Saving %dx%d bitmap to %s.", bitmap.getWidth(), bitmap.getHeight(), root);
-        final File myDir = new File(root);
-
-        if (!myDir.mkdirs()) {
-            Timber.i("Make dir failed");
-        }
-
-        final String fname = filename;
-        final File file = new File(myDir, fname);
-        if (file.exists()) {
-            file.delete();
-        }
-        try {
-            final FileOutputStream out = new FileOutputStream(file);
-            bitmap.compress(Bitmap.CompressFormat.PNG, 99, out);
-            out.flush();
-            out.close();
-        } catch (final Exception e) {
-            Timber.e(e, "Exception!");
         }
     }
 
@@ -108,9 +63,7 @@ public class ImageUtils {
         int i = 0;
         for (int y = 0; y < height; y++) {
             int pY = yRowStride * y;
-            int uv_row_start = uvRowStride * (y >> 1);
-            int pUV = uv_row_start;
-            int pV = uv_row_start;
+            int pUV = uvRowStride * (y >> 1);
 
             for (int x = 0; x < width; x++) {
                 int uv_offset = pUV + (x >> 1) * uvPixelStride;

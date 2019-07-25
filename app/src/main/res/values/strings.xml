@@ -14,7 +14,6 @@
  limitations under the License.
 -->
 <resources>
-    <string name="app_name">TensorFlow Demo</string>
-    <string name="activity_name_stylize">TF Stylize</string>
+    <string name="app_name">TF Stylize</string>
     <string name="camera_error">This device doesn\'t support Camera2 API.</string>
 </resources>

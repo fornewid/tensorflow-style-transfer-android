@@ -47,8 +47,8 @@ import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
-import android.widget.Toast;
 
+import org.jetbrains.annotations.NotNull;
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 import org.tensorflow.demo.OverlayView.DrawCallback;
 import org.tensorflow.demo.env.BorderedText;
@@ -74,8 +74,6 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
     private static final String STYLE_NODE = "style_num";
     private static final String OUTPUT_NODE = "transformer/expand/conv3/conv/Sigmoid";
     private static final int NUM_STYLES = 26;
-
-    private static final boolean SAVE_PREVIEW_BITMAP = false;
 
     // Whether to actively manipulate non-selected sliders so that sum of activations always appears
     // to be 1.0. The actual style input tensor will be normalized to sum to 1.0 regardless.
@@ -285,36 +283,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
                             sizeButton.postInvalidate();
                         }
                     });
-
-            final Button saveButton =
-                    new Button(StylizeActivity.this) {
-                        @Override
-                        protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
-                            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-                            setMeasuredDimension(getMeasuredWidth(), getMeasuredWidth());
-                        }
-                    };
-            saveButton.setText("save");
-            saveButton.setTextSize(12);
-
-            saveButton.setOnClickListener(
-                    new OnClickListener() {
-                        @Override
-                        public void onClick(final View v) {
-                            if (textureCopyBitmap != null) {
-                                // TODO(andrewharp): Save as jpeg with guaranteed unique filename.
-                                ImageUtils.saveBitmap(textureCopyBitmap, "stylized" + frameNum + ".png");
-                                Toast.makeText(
-                                        StylizeActivity.this,
-                                        "Saved image to: /sdcard/tensorflow/" + "stylized" + frameNum + ".png",
-                                        Toast.LENGTH_LONG)
-                                        .show();
-                            }
-                        }
-                    });
-
             buttons.add(sizeButton);
-            buttons.add(saveButton);
 
             for (int i = 0; i < NUM_STYLES; ++i) {
                 Timber.v("Creating item %d", i);
@@ -378,16 +347,15 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
 
         sensorOrientation = rotation + screenOrientation;
 
-        addCallback(
-                new DrawCallback() {
-                    @Override
-                    public void drawCallback(final Canvas canvas) {
-                        renderDebug(canvas);
-                    }
-                });
+        addCallback(new DrawCallback() {
+            @Override
+            public void drawCallback(@NotNull final Canvas canvas) {
+                renderDebug(canvas);
+            }
+        });
 
         adapter = new ImageGridAdapter();
-        grid = (GridView) findViewById(R.id.grid_layout);
+        grid = findViewById(R.id.grid_layout);
         grid.setAdapter(adapter);
         grid.setOnTouchListener(gridTouchAdapter);
 
@@ -528,27 +496,21 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
         final Canvas canvas = new Canvas(croppedBitmap);
         canvas.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
 
-        // For examining the actual TF input.
-        if (SAVE_PREVIEW_BITMAP) {
-            ImageUtils.saveBitmap(croppedBitmap);
-        }
+        runInBackground(new Runnable() {
+            @Override
+            public void run() {
+                cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
 
-        runInBackground(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
+                final long startTime = SystemClock.uptimeMillis();
+                stylizeImage(croppedBitmap);
+                lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
-                        final long startTime = SystemClock.uptimeMillis();
-                        stylizeImage(croppedBitmap);
-                        lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
+                textureCopyBitmap = Bitmap.createBitmap(croppedBitmap);
 
-                        textureCopyBitmap = Bitmap.createBitmap(croppedBitmap);
-
-                        requestRender();
-                        computing = false;
-                    }
-                });
+                requestRender();
+                computing = false;
+            }
+        });
 
         Trace.endSection();
     }
