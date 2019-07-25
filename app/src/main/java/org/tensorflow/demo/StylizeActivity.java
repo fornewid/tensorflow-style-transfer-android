@@ -51,8 +51,6 @@ import com.otaliastudios.cameraview.CameraView;
 import com.otaliastudios.cameraview.frame.Frame;
 import com.otaliastudios.cameraview.frame.FrameProcessor;
 
-import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -65,11 +63,12 @@ import timber.log.Timber;
  */
 public class StylizeActivity extends AppCompatActivity implements FrameProcessor {
 
-    private TensorFlowInferenceInterface inferenceInterface;
-    private static final String MODEL_FILE = "file:///android_asset/stylize_quantized.pb";
-    private static final String INPUT_NODE = "input";
-    private static final String STYLE_NODE = "style_num";
-    private static final String OUTPUT_NODE = "transformer/expand/conv3/conv/Sigmoid";
+    private static final int PERMISSIONS_REQUEST = 1;
+
+    private static final String PERMISSION_CAMERA = Manifest.permission.CAMERA;
+
+    private CameraView cameraView;
+
     private static final int NUM_STYLES = 26;
 
     // Whether to actively manipulate non-selected sliders so that sum of activations always appears
@@ -91,11 +90,6 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
     private Bitmap croppedBitmap = null;
 
     private final float[] styleVals = new float[NUM_STYLES];
-    private int[] intValues;
-    private float[] floatValues;
-
-    private Bitmap cropCopyBitmap;
-    private Bitmap textureCopyBitmap;
 
     private boolean computing = false;
 
@@ -106,9 +100,10 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
     private boolean allZero = false;
 
     private ImageGridAdapter adapter;
-    private GridView grid;
 
     private ImageView overlay;
+
+    private Stylize stylize;
 
     private final OnTouchListener gridTouchAdapter = new OnTouchListener() {
         ImageSlider slider = null;
@@ -158,6 +153,8 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_stylize);
 
+        stylize = new Stylize(getAssets());
+
         cameraView = findViewById(R.id.cameraView);
         overlay = findViewById(R.id.overlay);
 
@@ -168,10 +165,8 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
 
         sensorOrientation = screenOrientation;
 
-        inferenceInterface = new TensorFlowInferenceInterface(getAssets(), MODEL_FILE);
-
         adapter = new ImageGridAdapter();
-        grid = findViewById(R.id.grid_layout);
+        GridView grid = findViewById(R.id.grid_layout);
         grid.setAdapter(adapter);
         grid.setOnTouchListener(gridTouchAdapter);
 
@@ -393,6 +388,7 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
                 adapter.items[i].postInvalidate();
             }
         }
+        stylize.setStyleValues(styleVals);
     }
 
     private void onImageAvailable(final Bitmap bitmap) {
@@ -408,9 +404,6 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
                             previewWidth, previewHeight,
                             desiredSize, desiredSize,
                             sensorOrientation, true);
-
-            intValues = new int[desiredSize * desiredSize];
-            floatValues = new float[desiredSize * desiredSize * 3];
             initializedSize = desiredSize;
         }
 
@@ -419,63 +412,20 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         final Canvas canvas = new Canvas(croppedBitmap);
         canvas.drawBitmap(bitmap, frameToCropTransform, null);
 
-        cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
+        Bitmap cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
+        final Bitmap stylizedImage = stylize.stylize(croppedBitmap, desiredSize);
 
-        stylizeImage(croppedBitmap);
-
-        textureCopyBitmap = Bitmap.createBitmap(croppedBitmap);
-
-        requestRender();
         computing = false;
-    }
 
-    private void stylizeImage(final Bitmap bitmap) {
-        bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
-
-        for (int i = 0; i < intValues.length; ++i) {
-            final int val = intValues[i];
-            floatValues[i * 3] = ((val >> 16) & 0xFF) / 255.0f;
-            floatValues[i * 3 + 1] = ((val >> 8) & 0xFF) / 255.0f;
-            floatValues[i * 3 + 2] = (val & 0xFF) / 255.0f;
-        }
-
-        // Copy the input data into TensorFlow.
-        inferenceInterface.feed(INPUT_NODE, floatValues, 1, bitmap.getWidth(), bitmap.getHeight(), 3);
-        inferenceInterface.feed(STYLE_NODE, styleVals, NUM_STYLES);
-
-        // Execute the output node's dependency sub-graph.
-        inferenceInterface.run(new String[]{OUTPUT_NODE}, false);
-
-        // Copy the data from TensorFlow back into our array.
-        inferenceInterface.fetch(OUTPUT_NODE, floatValues);
-
-        for (int i = 0; i < intValues.length; ++i) {
-            intValues[i] =
-                    0xFF000000
-                            | (((int) (floatValues[i * 3] * 255)) << 16)
-                            | (((int) (floatValues[i * 3 + 1] * 255)) << 8)
-                            | ((int) (floatValues[i * 3 + 2] * 255));
-        }
-
-        bitmap.setPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
-    }
-
-    private void requestRender() {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                overlay.setImageBitmap(textureCopyBitmap);
+                overlay.setImageBitmap(stylizedImage);
             }
         });
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////
-
-    private static final int PERMISSIONS_REQUEST = 1;
-
-    private static final String PERMISSION_CAMERA = Manifest.permission.CAMERA;
-
-    private CameraView cameraView;
 
     @Override
     public void onDestroy() {
