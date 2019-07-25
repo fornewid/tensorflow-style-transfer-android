@@ -16,7 +16,9 @@
 
 package org.tensorflow.demo;
 
+import android.Manifest;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -26,8 +28,8 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.view.Display;
 import android.view.MotionEvent;
 import android.view.View;
@@ -38,16 +40,18 @@ import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.ml.vision.common.FirebaseVisionImage;
 import com.google.firebase.ml.vision.common.FirebaseVisionImageMetadata;
+import com.otaliastudios.cameraview.CameraView;
 import com.otaliastudios.cameraview.frame.Frame;
+import com.otaliastudios.cameraview.frame.FrameProcessor;
 
-import org.jetbrains.annotations.NotNull;
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
-import org.tensorflow.demo.OverlayView.DrawCallback;
 import org.tensorflow.demo.env.ImageUtils;
 
 import java.io.IOException;
@@ -60,7 +64,7 @@ import timber.log.Timber;
  * Sample activity that stylizes the camera preview according to "A Learned Representation For
  * Artistic Style" (https://arxiv.org/abs/1610.07629)
  */
-public class StylizeActivity extends CameraActivity {
+public class StylizeActivity extends AppCompatActivity implements FrameProcessor {
 
     private TensorFlowInferenceInterface inferenceInterface;
     private static final String MODEL_FILE = "file:///android_asset/stylize_quantized.pb";
@@ -97,7 +101,6 @@ public class StylizeActivity extends CameraActivity {
     private boolean computing = false;
 
     private Matrix frameToCropTransform;
-    private Matrix cropToFrameTransform;
 
     private int lastOtherStyle = 1;
 
@@ -105,6 +108,8 @@ public class StylizeActivity extends CameraActivity {
 
     private ImageGridAdapter adapter;
     private GridView grid;
+
+    private ImageView overlay;
 
     private final OnTouchListener gridTouchAdapter = new OnTouchListener() {
         ImageSlider slider = null;
@@ -152,7 +157,32 @@ public class StylizeActivity extends CameraActivity {
     @Override
     public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setupView();
+        setContentView(R.layout.activity_stylize);
+
+        cameraView = findViewById(R.id.cameraView);
+        overlay = findViewById(R.id.overlay);
+
+        final Display display = getWindowManager().getDefaultDisplay();
+        final int screenOrientation = display.getRotation();
+
+        Timber.i("Sensor orientation: %d, Screen orientation: %d", 0, screenOrientation);
+
+        sensorOrientation = screenOrientation;
+
+        inferenceInterface = new TensorFlowInferenceInterface(getAssets(), MODEL_FILE);
+
+        adapter = new ImageGridAdapter();
+        grid = findViewById(R.id.grid_layout);
+        grid.setAdapter(adapter);
+        grid.setOnTouchListener(gridTouchAdapter);
+
+        setStyle(adapter.items[0], 1.0f);
+
+        if (hasPermission()) {
+            bindCamera();
+        } else {
+            requestPermission();
+        }
     }
 
     public static Bitmap getBitmapFromAsset(final Context context, final String filePath) {
@@ -292,32 +322,6 @@ public class StylizeActivity extends CameraActivity {
         }
     }
 
-    private void setupView() {
-        final Display display = getWindowManager().getDefaultDisplay();
-        final int screenOrientation = display.getRotation();
-
-        Timber.i("Sensor orientation: %d, Screen orientation: %d", 0, screenOrientation);
-
-        sensorOrientation = screenOrientation;
-
-        inferenceInterface = new TensorFlowInferenceInterface(getAssets(), MODEL_FILE);
-
-
-        addCallback(new DrawCallback() {
-            @Override
-            public void drawCallback(@NotNull final Canvas canvas) {
-                renderDebug(canvas);
-            }
-        });
-
-        adapter = new ImageGridAdapter();
-        grid = findViewById(R.id.grid_layout);
-        grid.setAdapter(adapter);
-        grid.setOnTouchListener(gridTouchAdapter);
-
-        setStyle(adapter.items[0], 1.0f);
-    }
-
     @Override
     public void process(@NonNull Frame frame) {
         previewWidth = frame.getSize().getWidth();
@@ -406,9 +410,6 @@ public class StylizeActivity extends CameraActivity {
                             desiredSize, desiredSize,
                             sensorOrientation, true);
 
-            cropToFrameTransform = new Matrix();
-            frameToCropTransform.invert(cropToFrameTransform);
-
             intValues = new int[desiredSize * desiredSize];
             floatValues = new float[desiredSize * desiredSize * 3];
             initializedSize = desiredSize;
@@ -460,16 +461,60 @@ public class StylizeActivity extends CameraActivity {
         bitmap.setPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
     }
 
-    private void renderDebug(final Canvas canvas) {
-        // TODO(andrewharp): move result display to its own View instead of using debug overlay.
-        final Bitmap texture = textureCopyBitmap;
-        if (texture != null) {
-            final Matrix matrix = new Matrix();
-            final float scaleFactor = Math.min(
-                    (float) canvas.getWidth() / texture.getWidth(),
-                    (float) canvas.getHeight() / texture.getHeight());
-            matrix.postScale(scaleFactor, scaleFactor);
-            canvas.drawBitmap(texture, matrix, new Paint());
+    private void requestRender() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                overlay.setImageBitmap(textureCopyBitmap);
+            }
+        });
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////
+
+    private static final int PERMISSIONS_REQUEST = 1;
+
+    private static final String PERMISSION_CAMERA = Manifest.permission.CAMERA;
+
+    private CameraView cameraView;
+
+    @Override
+    public void onDestroy() {
+        cameraView.clearFrameProcessors();
+        super.onDestroy();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            final int requestCode, @NonNull final String[] permissions, @NonNull final int[] grantResults) {
+        if (requestCode == PERMISSIONS_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                bindCamera();
+            } else {
+                requestPermission();
+            }
         }
+    }
+
+    private boolean hasPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return checkSelfPermission(PERMISSION_CAMERA) == PackageManager.PERMISSION_GRANTED;
+        } else {
+            return true;
+        }
+    }
+
+    private void requestPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (shouldShowRequestPermissionRationale(PERMISSION_CAMERA)) {
+                Toast.makeText(StylizeActivity.this, "Camera AND storage permission are required for this demo", Toast.LENGTH_LONG).show();
+            }
+            requestPermissions(new String[]{PERMISSION_CAMERA}, PERMISSIONS_REQUEST);
+        }
+    }
+
+    private void bindCamera() {
+        cameraView.setLifecycleOwner(this);
+        cameraView.addFrameProcessor(this);
     }
 }
