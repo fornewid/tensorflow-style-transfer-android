@@ -14,7 +14,7 @@
  limitations under the License.
 -->
 <resources>
-    <string name="description_info">Info</string>
-    <string name="request_permission">This sample needs camera permission.</string>
+    <string name="app_name">TensorFlow Demo</string>
+    <string name="activity_name_stylize">TF Stylize</string>
     <string name="camera_error">This device doesn\'t support Camera2 API.</string>
 </resources>
