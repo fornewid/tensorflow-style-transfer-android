@@ -53,7 +53,6 @@ import com.otaliastudios.cameraview.frame.FrameProcessor;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 
 import timber.log.Timber;
 
@@ -104,6 +103,8 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
     private ImageView overlay;
 
     private Stylize stylize;
+
+    private Button sizeButton;
 
     private final OnTouchListener gridTouchAdapter = new OnTouchListener() {
         ImageSlider slider = null;
@@ -156,7 +157,19 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         stylize = new Stylize(getAssets());
 
         cameraView = findViewById(R.id.cameraView);
-        overlay = findViewById(R.id.overlay);
+        overlay = findViewById(R.id.preview);
+        sizeButton = findViewById(R.id.sizeButton);
+        sizeButton.setText("" + desiredSize);
+        sizeButton.setOnClickListener(new OnClickListener() {
+
+            @Override
+            public void onClick(final View v) {
+                desiredSizeIndex = (desiredSizeIndex + 1) % SIZES.length;
+                desiredSize = SIZES[desiredSizeIndex];
+                sizeButton.setText("" + desiredSize);
+                sizeButton.postInvalidate();
+            }
+        });
 
         final Display display = getWindowManager().getDefaultDisplay();
         final int screenOrientation = display.getRotation();
@@ -251,29 +264,8 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
 
     private class ImageGridAdapter extends BaseAdapter {
         final ImageSlider[] items = new ImageSlider[NUM_STYLES];
-        final ArrayList<Button> buttons = new ArrayList<>();
 
         {
-            final Button sizeButton = new Button(StylizeActivity.this) {
-                @Override
-                protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
-                    super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-                    setMeasuredDimension(getMeasuredWidth(), getMeasuredWidth());
-                }
-            };
-            sizeButton.setText("" + desiredSize);
-            sizeButton.setOnClickListener(
-                    new OnClickListener() {
-                        @Override
-                        public void onClick(final View v) {
-                            desiredSizeIndex = (desiredSizeIndex + 1) % SIZES.length;
-                            desiredSize = SIZES[desiredSizeIndex];
-                            sizeButton.setText("" + desiredSize);
-                            sizeButton.postInvalidate();
-                        }
-                    });
-            buttons.add(sizeButton);
-
             for (int i = 0; i < NUM_STYLES; ++i) {
                 Timber.v("Creating item %d", i);
 
@@ -290,16 +282,12 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
 
         @Override
         public int getCount() {
-            return buttons.size() + NUM_STYLES;
+            return NUM_STYLES;
         }
 
         @Override
         public Object getItem(final int position) {
-            if (position < buttons.size()) {
-                return buttons.get(position);
-            } else {
-                return items[position - buttons.size()];
-            }
+            return items[position];
         }
 
         @Override
@@ -321,6 +309,23 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         previewWidth = frame.getSize().getWidth();
         previewHeight = frame.getSize().getHeight();
 
+        if (computing) return;
+
+        if (desiredSize != initializedSize) {
+            Timber.i("Initializing at size preview size %dx%d, stylize size %d",
+                    previewWidth, previewHeight, desiredSize);
+            croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Bitmap.Config.ARGB_8888);
+
+            frameToCropTransform =
+                    ImageUtils.getTransformationMatrix(
+                            previewWidth, previewHeight,
+                            desiredSize, desiredSize,
+                            sensorOrientation, true);
+            initializedSize = desiredSize;
+        }
+
+        computing = true;
+
         Bitmap bitmap = FirebaseVisionImage
                 .fromByteArray(frame.getData(), new FirebaseVisionImageMetadata.Builder()
                         .setFormat(FirebaseVisionImageMetadata.IMAGE_FORMAT_NV21)
@@ -329,7 +334,20 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
                         .setRotation(FirebaseVisionImageMetadata.ROTATION_90)
                         .build())
                 .getBitmap();
-        onImageAvailable(bitmap);
+
+        final Canvas canvas = new Canvas(croppedBitmap);
+        canvas.drawBitmap(bitmap, frameToCropTransform, null);
+
+        final Bitmap stylizedImage = stylize.stylize(croppedBitmap, desiredSize);
+
+        computing = false;
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                overlay.setImageBitmap(stylizedImage);
+            }
+        });
     }
 
     private void setStyle(final ImageSlider slider, final float value) {
@@ -389,40 +407,6 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
             }
         }
         stylize.setStyleValues(styleVals);
-    }
-
-    private void onImageAvailable(final Bitmap bitmap) {
-        if (computing) return;
-
-        if (desiredSize != initializedSize) {
-            Timber.i("Initializing at size preview size %dx%d, stylize size %d",
-                    previewWidth, previewHeight, desiredSize);
-            croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Bitmap.Config.ARGB_8888);
-
-            frameToCropTransform =
-                    ImageUtils.getTransformationMatrix(
-                            previewWidth, previewHeight,
-                            desiredSize, desiredSize,
-                            sensorOrientation, true);
-            initializedSize = desiredSize;
-        }
-
-        computing = true;
-
-        final Canvas canvas = new Canvas(croppedBitmap);
-        canvas.drawBitmap(bitmap, frameToCropTransform, null);
-
-        Bitmap cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
-        final Bitmap stylizedImage = stylize.stylize(croppedBitmap, desiredSize);
-
-        computing = false;
-
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                overlay.setImageBitmap(stylizedImage);
-            }
-        });
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////
