@@ -53,20 +53,20 @@ import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 import org.tensorflow.demo.OverlayView.DrawCallback;
 import org.tensorflow.demo.env.BorderedText;
 import org.tensorflow.demo.env.ImageUtils;
-import org.tensorflow.demo.env.Logger;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Vector;
+import java.util.List;
+
+import timber.log.Timber;
 
 /**
  * Sample activity that stylizes the camera preview according to "A Learned Representation For
  * Artistic Style" (https://arxiv.org/abs/1610.07629)
  */
 public class StylizeActivity extends CameraActivity implements OnImageAvailableListener {
-    private static final Logger LOGGER = new Logger();
 
     private TensorFlowInferenceInterface inferenceInterface;
     private static final String MODEL_FILE = "file:///android_asset/stylize_quantized.pb";
@@ -200,7 +200,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
             final InputStream inputStream = assetManager.open(filePath);
             bitmap = BitmapFactory.decodeStream(inputStream);
         } catch (final IOException e) {
-            LOGGER.e("Error opening bitmap!", e);
+            Timber.e("Error opening bitmap!", e);
         }
 
         return bitmap;
@@ -267,14 +267,13 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
         final ArrayList<Button> buttons = new ArrayList<>();
 
         {
-            final Button sizeButton =
-                    new Button(StylizeActivity.this) {
-                        @Override
-                        protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
-                            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-                            setMeasuredDimension(getMeasuredWidth(), getMeasuredWidth());
-                        }
-                    };
+            final Button sizeButton = new Button(StylizeActivity.this) {
+                @Override
+                protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
+                    super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+                    setMeasuredDimension(getMeasuredWidth(), getMeasuredWidth());
+                }
+            };
             sizeButton.setText("" + desiredSize);
             sizeButton.setOnClickListener(
                     new OnClickListener() {
@@ -318,7 +317,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
             buttons.add(saveButton);
 
             for (int i = 0; i < NUM_STYLES; ++i) {
-                LOGGER.v("Creating item %d", i);
+                Timber.v("Creating item %d", i);
 
                 if (items[i] == null) {
                     final ImageSlider slider = new ImageSlider(StylizeActivity.this);
@@ -375,7 +374,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
         final Display display = getWindowManager().getDefaultDisplay();
         final int screenOrientation = display.getRotation();
 
-        LOGGER.i("Sensor orientation: %d, Screen orientation: %d", rotation, screenOrientation);
+        Timber.i("Sensor orientation: %d, Screen orientation: %d", rotation, screenOrientation);
 
         sensorOrientation = rotation + screenOrientation;
 
@@ -470,7 +469,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
             }
 
             if (desiredSize != initializedSize) {
-                LOGGER.i(
+                Timber.i(
                         "Initializing at size preview size %dx%d, stylize size %d",
                         previewWidth, previewHeight, desiredSize);
                 rgbBytes = new int[previewWidth * previewHeight];
@@ -520,7 +519,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
             if (image != null) {
                 image.close();
             }
-            LOGGER.e(e, "Exception!");
+            Timber.e(e, "Exception!");
             Trace.endSection();
             return;
         }
@@ -636,7 +635,7 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
                 canvas.getHeight() - copy.getHeight() * scaleFactor);
         canvas.drawBitmap(copy, matrix, new Paint());
 
-        final Vector<String> lines = new Vector<>();
+        final List<String> lines = new ArrayList<>();
 
         // Add these three lines:
         final String[] statLines = inferenceInterface.getStatString().split("\n");
@@ -651,6 +650,6 @@ public class StylizeActivity extends CameraActivity implements OnImageAvailableL
         lines.add("Desired size: " + desiredSize);
         lines.add("Initialized size: " + initializedSize);
 
-        borderedText.drawLines(canvas, 10, canvas.getHeight() - 10, lines);
+        borderedText.drawText(canvas, 10, canvas.getHeight() - 10, lines);
     }
 }

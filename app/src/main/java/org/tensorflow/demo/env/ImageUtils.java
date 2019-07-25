@@ -22,18 +22,18 @@ import android.os.Environment;
 import java.io.File;
 import java.io.FileOutputStream;
 
+import timber.log.Timber;
+
 /**
  * Utility class for manipulating images.
  **/
 public class ImageUtils {
-    @SuppressWarnings("unused")
-    private static final Logger LOGGER = new Logger();
 
     static {
         try {
             System.loadLibrary("tensorflow_demo");
         } catch (UnsatisfiedLinkError e) {
-            LOGGER.w("Native library not found, native RGB -> YUV conversion may be unavailable.");
+            Timber.w("Native library not found, native RGB -> YUV conversion may be unavailable.");
         }
     }
 
@@ -55,11 +55,11 @@ public class ImageUtils {
     public static void saveBitmap(final Bitmap bitmap, final String filename) {
         final String root =
                 Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "tensorflow";
-        LOGGER.i("Saving %dx%d bitmap to %s.", bitmap.getWidth(), bitmap.getHeight(), root);
+        Timber.i("Saving %dx%d bitmap to %s.", bitmap.getWidth(), bitmap.getHeight(), root);
         final File myDir = new File(root);
 
         if (!myDir.mkdirs()) {
-            LOGGER.i("Make dir failed");
+            Timber.i("Make dir failed");
         }
 
         final String fname = filename;
@@ -73,7 +73,7 @@ public class ImageUtils {
             out.flush();
             out.close();
         } catch (final Exception e) {
-            LOGGER.e(e, "Exception!");
+            Timber.e(e, "Exception!");
         }
     }
 
@@ -100,7 +100,7 @@ public class ImageUtils {
                         yData, uData, vData, out, width, height, yRowStride, uvRowStride, uvPixelStride, false);
                 return;
             } catch (UnsatisfiedLinkError e) {
-                LOGGER.w("Native YUV -> RGB implementation not found, falling back to Java implementation");
+                Timber.w("Native YUV -> RGB implementation not found, falling back to Java implementation");
                 useNativeConversion = false;
             }
         }

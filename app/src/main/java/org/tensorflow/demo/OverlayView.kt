@@ -13,43 +13,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-package org.tensorflow.demo;
+package org.tensorflow.demo
 
-import android.content.Context;
-import android.graphics.Canvas;
-import android.util.AttributeSet;
-import android.view.View;
-
-import java.util.LinkedList;
-import java.util.List;
+import android.content.Context
+import android.graphics.Canvas
+import android.util.AttributeSet
+import android.view.View
 
 /**
  * A simple View providing a render callback to other classes.
  */
-public class OverlayView extends View {
+class OverlayView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
 
-    private final List<DrawCallback> callbacks = new LinkedList<DrawCallback>();
-
-    public OverlayView(final Context context, final AttributeSet attrs) {
-        super(context, attrs);
-    }
+    private val callbacks = ArrayList<DrawCallback>()
 
     /**
      * Interface defining the callback for client classes.
      */
-    public interface DrawCallback {
-        public void drawCallback(final Canvas canvas);
+    interface DrawCallback {
+
+        fun drawCallback(canvas: Canvas)
     }
 
-    public void addCallback(final DrawCallback callback) {
-        callbacks.add(callback);
+    fun addCallback(callback: DrawCallback) {
+        callbacks.add(callback)
     }
 
-    @Override
-    public void draw(final Canvas canvas) {
-        super.draw(canvas);
-        for (final DrawCallback callback : callbacks) {
-            callback.drawCallback(canvas);
+    override fun draw(canvas: Canvas) {
+        super.draw(canvas)
+        for (callback in callbacks) {
+            callback.drawCallback(canvas)
         }
     }
 }
