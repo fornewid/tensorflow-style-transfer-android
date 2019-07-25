@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-package org.tensorflow.demo.env;
+package org.tensorflow.demo;
 
 import android.graphics.Matrix;
 

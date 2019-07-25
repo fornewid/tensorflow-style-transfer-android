@@ -52,7 +52,6 @@ import com.otaliastudios.cameraview.frame.Frame;
 import com.otaliastudios.cameraview.frame.FrameProcessor;
 
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
-import org.tensorflow.demo.env.ImageUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
