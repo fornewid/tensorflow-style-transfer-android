@@ -167,10 +167,11 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
 
     @Override
     public void process(@NonNull Frame frame) {
+        if (computing) return;
+        computing = true;
+
         int previewWidth = frame.getSize().getWidth();
         int previewHeight = frame.getSize().getHeight();
-
-        if (computing) return;
 
         if (desiredSize != initializedSize) {
             Timber.i("Initializing at size preview size %dx%d, stylize size %d",
@@ -184,8 +185,6 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
                             0, true);
             initializedSize = desiredSize;
         }
-
-        computing = true;
 
         Bitmap bitmap = FirebaseVisionImage
                 .fromByteArray(frame.getData(), new FirebaseVisionImageMetadata.Builder()
