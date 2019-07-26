@@ -13,14 +13,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-package org.tensorflow.demo;
+package org.tensorflow.demo
 
-import android.graphics.Matrix;
+import android.graphics.Matrix
+import kotlin.math.abs
+import kotlin.math.max
 
 /**
  * Utility class for manipulating images.
- **/
-public class ImageUtils {
+ */
+object ImageUtils {
 
     /**
      * Returns a transformation matrix from one reference frame into another.
@@ -36,51 +38,53 @@ public class ImageUtils {
      *                            cropping the image if necessary.
      * @return The transformation fulfilling the desired requirements.
      */
-    public static Matrix getTransformationMatrix(
-            final int srcWidth,
-            final int srcHeight,
-            final int dstWidth,
-            final int dstHeight,
-            final int applyRotation,
-            final boolean maintainAspectRatio) {
-        final Matrix matrix = new Matrix();
+    @JvmStatic
+    fun getTransformationMatrix(
+        srcWidth: Int,
+        srcHeight: Int,
+        dstWidth: Int,
+        dstHeight: Int,
+        applyRotation: Int,
+        maintainAspectRatio: Boolean
+    ): Matrix {
+        val matrix = Matrix()
 
         if (applyRotation != 0) {
             // Translate so center of image is at origin.
-            matrix.postTranslate(-srcWidth / 2.0f, -srcHeight / 2.0f);
+            matrix.postTranslate(-srcWidth / 2f, -srcHeight / 2f)
 
             // Rotate around origin.
-            matrix.postRotate(applyRotation);
+            matrix.postRotate(applyRotation.toFloat())
         }
 
         // Account for the already applied rotation, if any, and then determine how
         // much scaling is needed for each axis.
-        final boolean transpose = (Math.abs(applyRotation) + 90) % 180 == 0;
+        val transpose = (abs(applyRotation) + 90) % 180 == 0
 
-        final int inWidth = transpose ? srcHeight : srcWidth;
-        final int inHeight = transpose ? srcWidth : srcHeight;
+        val inWidth = if (transpose) srcHeight else srcWidth
+        val inHeight = if (transpose) srcWidth else srcHeight
 
         // Apply scaling if necessary.
         if (inWidth != dstWidth || inHeight != dstHeight) {
-            final float scaleFactorX = dstWidth / (float) inWidth;
-            final float scaleFactorY = dstHeight / (float) inHeight;
+            val scaleFactorX = dstWidth / inWidth.toFloat()
+            val scaleFactorY = dstHeight / inHeight.toFloat()
 
             if (maintainAspectRatio) {
                 // Scale by minimum factor so that dst is filled completely while
                 // maintaining the aspect ratio. Some image may fall off the edge.
-                final float scaleFactor = Math.max(scaleFactorX, scaleFactorY);
-                matrix.postScale(scaleFactor, scaleFactor);
+                val scaleFactor = max(scaleFactorX, scaleFactorY)
+                matrix.postScale(scaleFactor, scaleFactor)
             } else {
                 // Scale exactly to fill dst from src.
-                matrix.postScale(scaleFactorX, scaleFactorY);
+                matrix.postScale(scaleFactorX, scaleFactorY)
             }
         }
 
         if (applyRotation != 0) {
             // Translate back from origin centered reference to destination frame.
-            matrix.postTranslate(dstWidth / 2.0f, dstHeight / 2.0f);
+            matrix.postTranslate(dstWidth / 2f, dstHeight / 2f)
         }
 
-        return matrix;
+        return matrix
     }
 }
