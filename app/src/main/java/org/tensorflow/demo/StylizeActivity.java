@@ -23,10 +23,7 @@ import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Matrix;
-import android.graphics.Paint;
-import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
@@ -119,7 +116,7 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
                         child.getHitRect(rect);
                         if (rect.contains((int) event.getX(), (int) event.getY())) {
                             slider = child;
-                            slider.setHilighted(true);
+                            slider.setHighlight(true);
                         }
                     }
                     break;
@@ -137,7 +134,7 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
 
                 case MotionEvent.ACTION_UP:
                     if (slider != null) {
-                        slider.setHilighted(false);
+                        slider.setHighlight(false);
                         slider = null;
                     }
                     break;
@@ -204,62 +201,6 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         }
 
         return bitmap;
-    }
-
-    private class ImageSlider extends ImageView {
-        private float value = 0.0f;
-        private boolean hilighted = false;
-
-        private final Paint boxPaint;
-        private final Paint linePaint;
-
-        public ImageSlider(final Context context) {
-            super(context);
-
-            boxPaint = new Paint();
-            boxPaint.setColor(Color.BLACK);
-            boxPaint.setAlpha(128);
-
-            linePaint = new Paint();
-            linePaint.setColor(Color.WHITE);
-            linePaint.setStrokeWidth(10.0f);
-            linePaint.setStyle(Style.STROKE);
-        }
-
-        @Override
-        public void onDraw(final Canvas canvas) {
-            super.onDraw(canvas);
-            final float y = (1.0f - value) * getHeight();
-
-            // If all sliders are zero, don't bother shading anything.
-            if (!allZero) {
-                canvas.drawRect(0, 0, getWidth(), y, boxPaint);
-            }
-
-            if (value > 0.0f) {
-                canvas.drawLine(0, y, getWidth(), y, linePaint);
-            }
-
-            if (hilighted) {
-                canvas.drawRect(0, 0, getWidth(), getHeight(), linePaint);
-            }
-        }
-
-        @Override
-        protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-            setMeasuredDimension(getMeasuredWidth(), getMeasuredWidth());
-        }
-
-        public void setValue(final float value) {
-            this.value = value;
-            postInvalidate();
-        }
-
-        public void setHilighted(final boolean highlighted) {
-            this.hilighted = highlighted;
-            this.postInvalidate();
-        }
     }
 
     private class ImageGridAdapter extends BaseAdapter {
@@ -360,7 +301,7 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
 
             for (int i = 0; i < NUM_STYLES; ++i) {
                 if (adapter.items[i] != slider) {
-                    otherSum += adapter.items[i].value;
+                    otherSum += adapter.items[i].getValue();
                 }
             }
 
@@ -372,12 +313,12 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
                     if (child == slider) {
                         continue;
                     }
-                    final float newVal = child.value * factor;
+                    final float newVal = child.getValue() * factor;
                     child.setValue(newVal > 0.01f ? newVal : 0.0f);
 
-                    if (child.value > highestOtherVal) {
+                    if (child.getValue() > highestOtherVal) {
                         lastOtherStyle = i;
-                        highestOtherVal = child.value;
+                        highestOtherVal = child.getValue();
                     }
                 }
             } else {
@@ -393,14 +334,18 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         final boolean lastAllZero = allZero;
         float sum = 0.0f;
         for (int i = 0; i < NUM_STYLES; ++i) {
-            sum += adapter.items[i].value;
+            sum += adapter.items[i].getValue();
         }
         allZero = sum == 0.0f;
+
+        for (ImageSlider item : adapter.items) {
+            item.setAllZero(allZero);
+        }
 
         // Now update the values used for the input tensor. If nothing is set, mix in everything
         // equally. Otherwise everything is normalized to sum to 1.0.
         for (int i = 0; i < NUM_STYLES; ++i) {
-            styleVals[i] = allZero ? 1.0f / NUM_STYLES : adapter.items[i].value / sum;
+            styleVals[i] = allZero ? 1.0f / NUM_STYLES : adapter.items[i].getValue() / sum;
 
             if (lastAllZero != allZero) {
                 adapter.items[i].postInvalidate();
