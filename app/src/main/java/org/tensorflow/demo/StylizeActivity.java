@@ -48,7 +48,7 @@ import timber.log.Timber;
  * Sample activity that stylizes the camera preview according to "A Learned Representation For
  * Artistic Styles" (https://arxiv.org/abs/1610.07629)
  */
-public class StylizeActivity extends AppCompatActivity implements FrameProcessor {
+public class StylizeActivity extends AppCompatActivity {
 
     private static final int PERMISSIONS_REQUEST = 1;
 
@@ -65,7 +65,7 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
     // Start at a medium size, but let the user step up through smaller sizes so they don't get
     // immediately stuck processing a large image.
     private int desiredSizeIndex = -1;
-    private int desiredSize = 720;
+    private int desiredSize = SIZES[5];
     private int initializedSize = 0;
 
     private Bitmap croppedBitmap = null;
@@ -80,11 +80,31 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
 
     private ImageGridAdapter adapter;
 
-    private ImageView overlay;
+    private ImageView preview;
 
     private Stylize stylize;
 
     private Button sizeButton;
+
+    private FrameProcessor frameProcessor = new FrameProcessor() {
+
+        @Override
+        public void process(@NonNull Frame frame) {
+            if (computing) return;
+            computing = true;
+
+            final Bitmap stylizedImage = getStylizedImageFrom(frame);
+
+            computing = false;
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    preview.setImageBitmap(stylizedImage);
+                }
+            });
+        }
+    };
 
     private final OnTouchListener gridTouchAdapter = new OnTouchListener() {
         ImageSlider slider = null;
@@ -137,7 +157,8 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         stylize = new Stylize(getAssets());
 
         cameraView = findViewById(R.id.cameraView);
-        overlay = findViewById(R.id.preview);
+        preview = findViewById(R.id.preview);
+
         sizeButton = findViewById(R.id.sizeButton);
         sizeButton.setText("" + desiredSize);
         sizeButton.setOnClickListener(new OnClickListener() {
@@ -166,10 +187,50 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
     }
 
     @Override
-    public void process(@NonNull Frame frame) {
-        if (computing) return;
-        computing = true;
+    public void onRequestPermissionsResult(
+            final int requestCode,
+            @NonNull final String[] permissions,
+            @NonNull final int[] grantResults
+    ) {
+        if (requestCode == PERMISSIONS_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                bindCamera();
+            } else {
+                requestPermission();
+            }
+        }
+    }
 
+    private boolean hasPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return checkSelfPermission(PERMISSION_CAMERA) == PackageManager.PERMISSION_GRANTED;
+        } else {
+            return true;
+        }
+    }
+
+    private void requestPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (shouldShowRequestPermissionRationale(PERMISSION_CAMERA)) {
+                Toast.makeText(StylizeActivity.this, "Camera AND storage permission are required for this demo", Toast.LENGTH_LONG).show();
+            }
+            requestPermissions(new String[]{PERMISSION_CAMERA}, PERMISSIONS_REQUEST);
+        }
+    }
+
+    private void bindCamera() {
+        cameraView.setLifecycleOwner(this);
+        cameraView.addFrameProcessor(frameProcessor);
+    }
+
+    @Override
+    public void onDestroy() {
+        cameraView.clearFrameProcessors();
+        super.onDestroy();
+    }
+
+    @NonNull
+    private Bitmap getStylizedImageFrom(@NonNull Frame frame) {
         int previewWidth = frame.getSize().getWidth();
         int previewHeight = frame.getSize().getHeight();
 
@@ -198,16 +259,7 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         final Canvas canvas = new Canvas(croppedBitmap);
         canvas.drawBitmap(bitmap, frameToCropTransform, null);
 
-        final Bitmap stylizedImage = stylize.stylize(croppedBitmap, desiredSize);
-
-        computing = false;
-
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                overlay.setImageBitmap(stylizedImage);
-            }
-        });
+        return stylize.stylize(croppedBitmap, desiredSize);
     }
 
     private void setStyle(final ImageSlider slider, final float value) {
@@ -265,56 +317,14 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
 
         // Now update the values used for the input tensor. If nothing is set, mix in everything
         // equally. Otherwise everything is normalized to sum to 1.0.
-        final float[] styleVals = new float[styleCount];
+        final float[] styleValues = new float[styleCount];
         for (int i = 0; i < styleCount; ++i) {
-            styleVals[i] = allZero ? 1.0f / styleCount : adapter.getItem(i).getValue() / sum;
+            styleValues[i] = allZero ? 1.0f / styleCount : adapter.getItem(i).getValue() / sum;
 
             if (lastAllZero != allZero) {
                 adapter.getItem(i).postInvalidate();
             }
         }
-        stylize.setStyleValues(styleVals);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////////////////
-
-    @Override
-    public void onDestroy() {
-        cameraView.clearFrameProcessors();
-        super.onDestroy();
-    }
-
-    @Override
-    public void onRequestPermissionsResult(
-            final int requestCode, @NonNull final String[] permissions, @NonNull final int[] grantResults) {
-        if (requestCode == PERMISSIONS_REQUEST) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                bindCamera();
-            } else {
-                requestPermission();
-            }
-        }
-    }
-
-    private boolean hasPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            return checkSelfPermission(PERMISSION_CAMERA) == PackageManager.PERMISSION_GRANTED;
-        } else {
-            return true;
-        }
-    }
-
-    private void requestPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (shouldShowRequestPermissionRationale(PERMISSION_CAMERA)) {
-                Toast.makeText(StylizeActivity.this, "Camera AND storage permission are required for this demo", Toast.LENGTH_LONG).show();
-            }
-            requestPermissions(new String[]{PERMISSION_CAMERA}, PERMISSIONS_REQUEST);
-        }
-    }
-
-    private void bindCamera() {
-        cameraView.setLifecycleOwner(this);
-        cameraView.addFrameProcessor(this);
+        stylize.setStyleValues(styleValues);
     }
 }
