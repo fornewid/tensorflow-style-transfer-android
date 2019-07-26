@@ -30,7 +30,6 @@ dependencies {
     implementation 'org.tensorflow:tensorflow-android:1.2.0-preview'
     implementation 'com.jakewharton.timber:timber:4.7.1'
     implementation 'com.otaliastudios:cameraview:2.0.0-rc1'
-    implementation 'com.google.firebase:firebase-core:17.0.1'
     implementation 'com.google.firebase:firebase-ml-vision:22.0.0'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.2.0'
