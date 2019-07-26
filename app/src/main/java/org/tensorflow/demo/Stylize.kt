@@ -7,12 +7,8 @@ import org.tensorflow.contrib.android.TensorFlowInferenceInterface
 
 internal class Stylize(assetManager: AssetManager) {
 
-    private val inference: TensorFlowInferenceInterface
+    private val inference = TensorFlowInferenceInterface(assetManager, MODEL_FILE)
     private val styleValues = ArrayList<Float>()
-
-    init {
-        inference = TensorFlowInferenceInterface(assetManager, MODEL_FILE)
-    }
 
     fun setStyleValues(styleValues: FloatArray) {
         this.styleValues.clear()

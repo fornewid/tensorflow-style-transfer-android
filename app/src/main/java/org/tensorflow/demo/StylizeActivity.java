@@ -17,23 +17,17 @@
 package org.tensorflow.demo;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.pm.PackageManager;
-import android.content.res.AssetManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.Display;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
-import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
@@ -48,14 +42,11 @@ import com.otaliastudios.cameraview.CameraView;
 import com.otaliastudios.cameraview.frame.Frame;
 import com.otaliastudios.cameraview.frame.FrameProcessor;
 
-import java.io.IOException;
-import java.io.InputStream;
-
 import timber.log.Timber;
 
 /**
  * Sample activity that stylizes the camera preview according to "A Learned Representation For
- * Artistic Style" (https://arxiv.org/abs/1610.07629)
+ * Artistic Styles" (https://arxiv.org/abs/1610.07629)
  */
 public class StylizeActivity extends AppCompatActivity implements FrameProcessor {
 
@@ -64,8 +55,6 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
     private static final String PERMISSION_CAMERA = Manifest.permission.CAMERA;
 
     private CameraView cameraView;
-
-    private static final int NUM_STYLES = 26;
 
     // Whether to actively manipulate non-selected sliders so that sum of activations always appears
     // to be 1.0. The actual style input tensor will be normalized to sum to 1.0 regardless.
@@ -79,13 +68,7 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
     private int desiredSize = 720;
     private int initializedSize = 0;
 
-    private Integer sensorOrientation;
-
-    private int previewWidth = 0;
-    private int previewHeight = 0;
     private Bitmap croppedBitmap = null;
-
-    private final float[] styleVals = new float[NUM_STYLES];
 
     private boolean computing = false;
 
@@ -110,8 +93,8 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         public boolean onTouch(final View v, final MotionEvent event) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    for (int i = 0; i < NUM_STYLES; ++i) {
-                        final ImageSlider child = adapter.items[i];
+                    for (int i = 0; i < Styles.getCount(); ++i) {
+                        final ImageSlider child = adapter.getItem(i);
                         final Rect rect = new Rect();
                         child.getHitRect(rect);
                         if (rect.contains((int) event.getX(), (int) event.getY())) {
@@ -168,19 +151,12 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
             }
         });
 
-        final Display display = getWindowManager().getDefaultDisplay();
-        final int screenOrientation = display.getRotation();
-
-        Timber.i("Sensor orientation: %d, Screen orientation: %d", 0, screenOrientation);
-
-        sensorOrientation = screenOrientation;
-
-        adapter = new ImageGridAdapter();
+        adapter = new ImageGridAdapter(this, Styles.getThumbnails());
         GridView grid = findViewById(R.id.grid_layout);
         grid.setAdapter(adapter);
         grid.setOnTouchListener(gridTouchAdapter);
 
-        setStyle(adapter.items[0], 1.0f);
+        setStyle(adapter.getItem(0), 1.0f);
 
         if (hasPermission()) {
             bindCamera();
@@ -189,66 +165,10 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
         }
     }
 
-    public static Bitmap getBitmapFromAsset(final Context context, final String filePath) {
-        final AssetManager assetManager = context.getAssets();
-
-        Bitmap bitmap = null;
-        try {
-            final InputStream inputStream = assetManager.open(filePath);
-            bitmap = BitmapFactory.decodeStream(inputStream);
-        } catch (final IOException e) {
-            Timber.e(e, "Error opening bitmap!");
-        }
-
-        return bitmap;
-    }
-
-    private class ImageGridAdapter extends BaseAdapter {
-        final ImageSlider[] items = new ImageSlider[NUM_STYLES];
-
-        {
-            for (int i = 0; i < NUM_STYLES; ++i) {
-                Timber.v("Creating item %d", i);
-
-                if (items[i] == null) {
-                    final ImageSlider slider = new ImageSlider(StylizeActivity.this);
-                    final Bitmap bm =
-                            getBitmapFromAsset(StylizeActivity.this, "thumbnails/style" + i + ".jpg");
-                    slider.setImageBitmap(bm);
-
-                    items[i] = slider;
-                }
-            }
-        }
-
-        @Override
-        public int getCount() {
-            return NUM_STYLES;
-        }
-
-        @Override
-        public Object getItem(final int position) {
-            return items[position];
-        }
-
-        @Override
-        public long getItemId(final int position) {
-            return getItem(position).hashCode();
-        }
-
-        @Override
-        public View getView(final int position, final View convertView, final ViewGroup parent) {
-            if (convertView != null) {
-                return convertView;
-            }
-            return (View) getItem(position);
-        }
-    }
-
     @Override
     public void process(@NonNull Frame frame) {
-        previewWidth = frame.getSize().getWidth();
-        previewHeight = frame.getSize().getHeight();
+        int previewWidth = frame.getSize().getWidth();
+        int previewHeight = frame.getSize().getHeight();
 
         if (computing) return;
 
@@ -261,7 +181,7 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
                     ImageUtils.getTransformationMatrix(
                             previewWidth, previewHeight,
                             desiredSize, desiredSize,
-                            sensorOrientation, true);
+                            0, true);
             initializedSize = desiredSize;
         }
 
@@ -294,22 +214,24 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
     private void setStyle(final ImageSlider slider, final float value) {
         slider.setValue(value);
 
+        final int styleCount = Styles.getCount();
+
         if (NORMALIZE_SLIDERS) {
             // Slider vals correspond directly to the input tensor vals, and normalization is visually
             // maintained by remanipulating non-selected sliders.
             float otherSum = 0.0f;
 
-            for (int i = 0; i < NUM_STYLES; ++i) {
-                if (adapter.items[i] != slider) {
-                    otherSum += adapter.items[i].getValue();
+            for (int i = 0; i < styleCount; ++i) {
+                if (adapter.getItem(i) != slider) {
+                    otherSum += adapter.getItem(i).getValue();
                 }
             }
 
             if (otherSum > 0.0) {
                 float highestOtherVal = 0;
                 final float factor = otherSum > 0.0f ? (1.0f - value) / otherSum : 0.0f;
-                for (int i = 0; i < NUM_STYLES; ++i) {
-                    final ImageSlider child = adapter.items[i];
+                for (int i = 0; i < styleCount; ++i) {
+                    final ImageSlider child = adapter.getItem(i);
                     if (child == slider) {
                         continue;
                     }
@@ -324,31 +246,32 @@ public class StylizeActivity extends AppCompatActivity implements FrameProcessor
             } else {
                 // Everything else is 0, so just pick a suitable slider to push up when the
                 // selected one goes down.
-                if (adapter.items[lastOtherStyle] == slider) {
-                    lastOtherStyle = (lastOtherStyle + 1) % NUM_STYLES;
+                if (adapter.getItem(lastOtherStyle) == slider) {
+                    lastOtherStyle = (lastOtherStyle + 1) % styleCount;
                 }
-                adapter.items[lastOtherStyle].setValue(1.0f - value);
+                adapter.getItem(lastOtherStyle).setValue(1.0f - value);
             }
         }
 
         final boolean lastAllZero = allZero;
         float sum = 0.0f;
-        for (int i = 0; i < NUM_STYLES; ++i) {
-            sum += adapter.items[i].getValue();
+        for (int i = 0; i < styleCount; ++i) {
+            sum += adapter.getItem(i).getValue();
         }
         allZero = sum == 0.0f;
 
-        for (ImageSlider item : adapter.items) {
+        for (ImageSlider item : adapter.getItems()) {
             item.setAllZero(allZero);
         }
 
         // Now update the values used for the input tensor. If nothing is set, mix in everything
         // equally. Otherwise everything is normalized to sum to 1.0.
-        for (int i = 0; i < NUM_STYLES; ++i) {
-            styleVals[i] = allZero ? 1.0f / NUM_STYLES : adapter.items[i].getValue() / sum;
+        final float[] styleVals = new float[styleCount];
+        for (int i = 0; i < styleCount; ++i) {
+            styleVals[i] = allZero ? 1.0f / styleCount : adapter.getItem(i).getValue() / sum;
 
             if (lastAllZero != allZero) {
-                adapter.items[i].postInvalidate();
+                adapter.getItem(i).postInvalidate();
             }
         }
         stylize.setStyleValues(styleVals);
