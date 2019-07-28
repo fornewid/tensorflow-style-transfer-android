@@ -106,22 +106,22 @@ class StylizeActivity : AppCompatActivity() {
         cameraView = findViewById(R.id.cameraView)
         preview = findViewById(R.id.preview)
 
+        val cameraButton: View = findViewById(R.id.cameraButton)
+        cameraButton.setOnClickListener {
+            cameraView.takePicture()
+        }
+
+        val galleryButton: View = findViewById(R.id.galleryButton)
+        galleryButton.setOnClickListener {
+            Gallery.takePicture(this)
+        }
+
         val sizeButton: Button = findViewById(R.id.sizeButton)
         sizeButton.text = "$desiredSize"
         sizeButton.setOnClickListener {
             desiredSizeIndex = (desiredSizeIndex + 1) % SIZES.size
             desiredSize = SIZES[desiredSizeIndex]
             sizeButton.text = "$desiredSize"
-        }
-
-        val pickButton: View = findViewById(R.id.pickButton)
-        pickButton.setOnClickListener {
-            Gallery.takePicture(this)
-        }
-
-        val captureButton: View = findViewById(R.id.captureButton)
-        captureButton.setOnClickListener {
-            cameraView.takePicture()
         }
 
         adapter = ImageGridAdapter(this, Styles.thumbnails)
