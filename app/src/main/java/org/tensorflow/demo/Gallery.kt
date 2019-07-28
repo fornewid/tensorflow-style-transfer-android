@@ -40,15 +40,15 @@ object Gallery {
         }
     }
 
-    private const val SCREENSHOTS_DIR_NAME = "Stylizes"
-    private const val SCREENSHOT_FILE_NAME_TEMPLATE = "Stylize_%s.png"
+    private const val DIR_NAME = "Stylizes"
+    private const val FILE_NAME_TEMPLATE = "Stylize_%s.png"
 
     fun saveBitmap(context: Context, bitmap: Bitmap) {
         val imageTime = System.currentTimeMillis()
         val imageDate = SimpleDateFormat("yyyyMMdd-HHmmss").format(Date(imageTime))
-        val imageFileName = String.format(SCREENSHOT_FILE_NAME_TEMPLATE, imageDate)
+        val imageFileName = String.format(FILE_NAME_TEMPLATE, imageDate)
 
-        val directory = File(Environment.getExternalStorageDirectory(), SCREENSHOTS_DIR_NAME)
+        val directory = File(Environment.getExternalStorageDirectory(), DIR_NAME)
         val imageFilePath = File(directory, imageFileName).absolutePath
 
         try {
@@ -83,7 +83,7 @@ object Gallery {
 
             val now = System.currentTimeMillis()
 
-            val mNotificationBuilder= NotificationCompat
+            val notificationBuilder = NotificationCompat
                 .Builder(context, NotificationChannels.STYLIZES)
                 .setContentTitle("Stylized image saved")
                 .setContentText("Tap to view your stylized image")
@@ -92,9 +92,15 @@ object Gallery {
                 .setWhen(now)
                 .setShowWhen(true)
                 .setAutoCancel(true)
+                .setLargeIcon(bitmap)
+                .setStyle(
+                    NotificationCompat.BigPictureStyle()
+                        .bigPicture(bitmap)
+                        .bigLargeIcon(null)
+                )
 
             val nm: NotificationManager? = context.getSystemService()
-            nm?.notify(1, mNotificationBuilder.build())
+            nm?.notify(1, notificationBuilder.build())
         } catch (e: IOException) {
             Toast.makeText(context, "Failed!", Toast.LENGTH_SHORT).show()
         }
