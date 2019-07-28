@@ -8,44 +8,48 @@
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:layout_marginBottom="60dp">
 
         <com.otaliastudios.cameraview.CameraView
             android:id="@+id/cameraView"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
             android:keepScreenOn="true"
             app:cameraAudio="off"
             app:cameraFacing="back"
-            app:cameraGestureTap="autoFocus"
+            app:layout_constraintBottom_toBottomOf="@id/topGuideline"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0" />
 
         <ImageView
             android:id="@+id/preview"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
+            android:layout_width="200dp"
+            android:layout_height="200dp"
             android:scaleType="fitCenter"
-            app:layout_constraintBottom_toBottomOf="@id/cameraView"
+            app:layout_constraintBottom_toBottomOf="@id/topGuideline"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="1" />
 
         <androidx.constraintlayout.widget.Guideline
             android:id="@+id/topGuideline"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            app:layout_constraintGuide_end="120dp" />
+            app:layout_constraintGuide_end="60dp" />
 
         <ImageView
             android:id="@+id/cameraButton"
             android:layout_width="60dp"
             android:layout_height="60dp"
             android:background="?selectableItemBackground"
-            android:src="@drawable/ic_photo_camera"
             android:scaleType="centerInside"
+            android:src="@drawable/ic_photo_camera"
             app:layout_constraintBottom_toBottomOf="@id/bottomGuideline"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="@id/topGuideline" />
@@ -55,10 +59,21 @@
             android:layout_width="60dp"
             android:layout_height="60dp"
             android:background="?selectableItemBackground"
-            android:src="@drawable/ic_photo_gallery"
             android:scaleType="centerInside"
-            app:layout_constraintStart_toEndOf="@id/cameraButton"
+            android:src="@drawable/ic_photo_gallery"
             app:layout_constraintBottom_toBottomOf="@id/bottomGuideline"
+            app:layout_constraintStart_toEndOf="@id/cameraButton"
+            app:layout_constraintTop_toTopOf="@id/topGuideline" />
+
+        <ImageView
+            android:id="@+id/cameraSwitchButton"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:background="?selectableItemBackground"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_camera_front"
+            app:layout_constraintBottom_toBottomOf="@id/bottomGuideline"
+            app:layout_constraintStart_toEndOf="@id/galleryButton"
             app:layout_constraintTop_toTopOf="@id/topGuideline" />
 
         <Button
@@ -75,14 +90,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            app:layout_constraintGuide_end="60dp" />
+            app:layout_constraintGuide_end="0dp" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/white"
+        android:background="@android:color/darker_gray"
         android:elevation="8dp"
         app:behavior_hideable="false"
         app:behavior_peekHeight="60dp"
@@ -105,7 +120,6 @@
             android:id="@+id/grid_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@android:color/black"
             android:elevation="8dp"
             android:numColumns="7"
             android:stretchMode="columnWidth"

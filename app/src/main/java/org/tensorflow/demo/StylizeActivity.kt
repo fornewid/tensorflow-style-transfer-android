@@ -21,6 +21,7 @@ import com.google.firebase.ml.vision.common.FirebaseVisionImage
 import com.otaliastudios.cameraview.CameraListener
 import com.otaliastudios.cameraview.CameraView
 import com.otaliastudios.cameraview.PictureResult
+import com.otaliastudios.cameraview.controls.Facing
 import com.otaliastudios.cameraview.internal.utils.WorkerHandler
 import kotlin.math.max
 import kotlin.math.min
@@ -114,6 +115,20 @@ class StylizeActivity : AppCompatActivity() {
         val galleryButton: View = findViewById(R.id.galleryButton)
         galleryButton.setOnClickListener {
             Gallery.takePicture(this)
+        }
+
+        val cameraSwitchButton: ImageView = findViewById(R.id.cameraSwitchButton)
+        cameraSwitchButton.setOnClickListener {
+            when (cameraView.facing) {
+                Facing.BACK -> {
+                    cameraSwitchButton.setImageResource(R.drawable.ic_camera_front)
+                    cameraView.facing = Facing.FRONT
+                }
+                Facing.FRONT -> {
+                    cameraSwitchButton.setImageResource(R.drawable.ic_camera_back)
+                    cameraView.facing = Facing.BACK
+                }
+            }
         }
 
         val sizeButton: Button = findViewById(R.id.sizeButton)
