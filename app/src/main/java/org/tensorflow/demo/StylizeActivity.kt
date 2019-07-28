@@ -169,7 +169,9 @@ class StylizeActivity : AppCompatActivity() {
 
     private fun hasPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            checkSelfPermission(PERMISSION_CAMERA) == PackageManager.PERMISSION_GRANTED
+            PERMISSIONS.all {
+                checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
+            }
         } else {
             true
         }
@@ -177,10 +179,7 @@ class StylizeActivity : AppCompatActivity() {
 
     private fun requestPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (shouldShowRequestPermissionRationale(PERMISSION_CAMERA)) {
-                Toast.makeText(this, "Camera AND storage permission are required for this demo", Toast.LENGTH_LONG).show()
-            }
-            requestPermissions(arrayOf(PERMISSION_CAMERA), PERMISSIONS_REQUEST)
+            requestPermissions(PERMISSIONS, PERMISSIONS_REQUEST)
         }
     }
 
@@ -313,7 +312,11 @@ class StylizeActivity : AppCompatActivity() {
 
         private const val PERMISSIONS_REQUEST = 1
 
-        private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
+        private val PERMISSIONS = arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        )
 
         // Whether to actively manipulate non-selected sliders so that sum of activations always appears
         // to be 1.0. The actual style input tensor will be normalized to sum to 1.0 regardless.
