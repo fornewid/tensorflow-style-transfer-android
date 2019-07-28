@@ -47,6 +47,14 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
+        android:id="@+id/pickButton"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:text="pick"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/sizeButton" />
+
+    <Button
         android:id="@+id/sizeButton"
         android:layout_width="50dp"
         android:layout_height="50dp"

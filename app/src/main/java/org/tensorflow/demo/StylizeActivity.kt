@@ -83,9 +83,25 @@ class StylizeActivity : AppCompatActivity() {
                     if (slider != null) {
                         slider?.setHighlight(false)
                         slider = null
+                        lastBitmap?.let {
+                            val stylizedImage = getStylizedImageFrom(it)
+                            runOnUiThread {
+                                preview.setImageBitmap(stylizedImage)
+                            }
+                        }
                     }
             }
             return true
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        Gallery.onPictureTaken(requestCode, resultCode, data) {
+            val stylizedImage = getStylizedImageFrom(it)
+            runOnUiThread {
+                preview.setImageBitmap(stylizedImage)
+            }
         }
     }
 
@@ -104,6 +120,11 @@ class StylizeActivity : AppCompatActivity() {
             desiredSizeIndex = (desiredSizeIndex + 1) % SIZES.size
             desiredSize = SIZES[desiredSizeIndex]
             sizeButton.text = "$desiredSize"
+        }
+
+        val pickButton: View = findViewById(R.id.pickButton)
+        pickButton.setOnClickListener {
+            Gallery.takePicture(this)
         }
 
         val captureButton: View = findViewById(R.id.captureButton)
