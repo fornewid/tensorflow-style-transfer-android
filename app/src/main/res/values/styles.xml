@@ -3,7 +3,6 @@
 
     <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowFullscreen">true</item>
-        <item name="android:colorBackground">@android:color/black</item>
     </style>
 
 </resources>

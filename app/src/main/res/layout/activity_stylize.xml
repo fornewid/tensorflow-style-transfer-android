@@ -18,6 +18,7 @@
             android:keepScreenOn="true"
             app:cameraAudio="off"
             app:cameraFacing="back"
+            app:cameraGestureTap="takePicture"
             app:layout_constraintBottom_toBottomOf="@id/topGuideline"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -58,6 +59,7 @@
             android:id="@+id/galleryButton"
             android:layout_width="60dp"
             android:layout_height="60dp"
+            android:layout_marginStart="8dp"
             android:background="?selectableItemBackground"
             android:scaleType="centerInside"
             android:src="@drawable/ic_photo_gallery"
@@ -69,6 +71,7 @@
             android:id="@+id/cameraSwitchButton"
             android:layout_width="60dp"
             android:layout_height="60dp"
+            android:layout_marginStart="8dp"
             android:background="?selectableItemBackground"
             android:scaleType="centerInside"
             android:src="@drawable/ic_camera_front"
@@ -76,14 +79,33 @@
             app:layout_constraintStart_toEndOf="@id/galleryButton"
             app:layout_constraintTop_toTopOf="@id/topGuideline" />
 
-        <Button
+        <TextView
             android:id="@+id/sizeButton"
-            android:layout_width="60dp"
+            android:layout_width="wrap_content"
             android:layout_height="60dp"
+            android:layout_marginEnd="8dp"
+            android:background="?selectableItemBackground"
+            android:gravity="center"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:textColor="@android:color/black"
+            android:textSize="20sp"
+            android:textStyle="bold"
             app:layout_constraintBottom_toBottomOf="@id/bottomGuideline"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/saveButton"
             app:layout_constraintTop_toTopOf="@id/topGuideline"
             tools:text="300" />
+
+        <ImageView
+            android:id="@+id/saveButton"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:background="?selectableItemBackground"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_save"
+            app:layout_constraintBottom_toBottomOf="@id/bottomGuideline"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/topGuideline" />
 
         <androidx.constraintlayout.widget.Guideline
             android:id="@+id/bottomGuideline"
@@ -97,7 +119,7 @@
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/darker_gray"
+        android:background="@android:color/white"
         android:elevation="8dp"
         app:behavior_hideable="false"
         app:behavior_peekHeight="60dp"
@@ -107,10 +129,11 @@
             android:id="@+id/grid_title"
             android:layout_width="0dp"
             android:layout_height="60dp"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:text="Choose styles"
+            android:gravity="center"
+            android:text="Choose your styles!"
+            android:textColor="@android:color/black"
+            android:textSize="20sp"
+            android:textStyle="bold"
             app:layout_constraintBottom_toTopOf="@id/grid_layout"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -120,6 +143,7 @@
             android:id="@+id/grid_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@android:color/black"
             android:elevation="8dp"
             android:numColumns="7"
             android:stretchMode="columnWidth"

@@ -12,9 +12,9 @@ import android.os.Bundle
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.OnTouchListener
-import android.widget.Button
 import android.widget.GridView
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.ml.vision.common.FirebaseVisionImage
@@ -121,17 +121,17 @@ class StylizeActivity : AppCompatActivity() {
         cameraSwitchButton.setOnClickListener {
             when (cameraView.facing) {
                 Facing.BACK -> {
-                    cameraSwitchButton.setImageResource(R.drawable.ic_camera_front)
+                    cameraSwitchButton.setImageResource(R.drawable.ic_camera_back)
                     cameraView.facing = Facing.FRONT
                 }
                 Facing.FRONT -> {
-                    cameraSwitchButton.setImageResource(R.drawable.ic_camera_back)
+                    cameraSwitchButton.setImageResource(R.drawable.ic_camera_front)
                     cameraView.facing = Facing.BACK
                 }
             }
         }
 
-        val sizeButton: Button = findViewById(R.id.sizeButton)
+        val sizeButton: TextView = findViewById(R.id.sizeButton)
         sizeButton.text = "$desiredSize"
         sizeButton.setOnClickListener {
             desiredSizeIndex = (desiredSizeIndex + 1) % SIZES.size
