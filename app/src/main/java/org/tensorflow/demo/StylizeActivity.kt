@@ -143,11 +143,7 @@ class StylizeActivity : AppCompatActivity() {
         val saveButton: View = findViewById(R.id.saveButton)
         saveButton.setOnClickListener {
             lastStylizedBitmap?.let {
-                if (Gallery.saveBitmap(it)) {
-                    Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Failed!", Toast.LENGTH_SHORT).show()
-                }
+                Gallery.saveBitmap(this, it)
             }
         }
 

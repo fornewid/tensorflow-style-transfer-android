@@ -2,15 +2,23 @@ package org.tensorflow.demo
 
 import android.app.Activity
 import android.app.Activity.RESULT_OK
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.core.app.NotificationCompat
+import androidx.core.content.getSystemService
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.text.SimpleDateFormat
-import java.util.Date
+import java.util.*
 
 object Gallery {
 
@@ -35,7 +43,7 @@ object Gallery {
     private const val SCREENSHOTS_DIR_NAME = "Stylizes"
     private const val SCREENSHOT_FILE_NAME_TEMPLATE = "Stylize_%s.png"
 
-    fun saveBitmap(bitmap: Bitmap): Boolean {
+    fun saveBitmap(context: Context, bitmap: Bitmap) {
         val imageTime = System.currentTimeMillis()
         val imageDate = SimpleDateFormat("yyyyMMdd-HHmmss").format(Date(imageTime))
         val imageFileName = String.format(SCREENSHOT_FILE_NAME_TEMPLATE, imageDate)
@@ -46,13 +54,49 @@ object Gallery {
         try {
             directory.mkdirs()
 
+            val dateSeconds = imageTime / 1000
+
             val out = FileOutputStream(imageFilePath)
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.flush()
             out.close()
-            return true
+
+            // Save the stylized image to the MediaStore
+            val values = ContentValues()
+            val resolver = context.contentResolver
+            values.put(MediaStore.Images.ImageColumns.DATA, imageFilePath)
+            values.put(MediaStore.Images.ImageColumns.TITLE, imageFileName)
+            values.put(MediaStore.Images.ImageColumns.DISPLAY_NAME, imageFileName)
+            values.put(MediaStore.Images.ImageColumns.DATE_TAKEN, imageTime)
+            values.put(MediaStore.Images.ImageColumns.DATE_ADDED, dateSeconds)
+            values.put(MediaStore.Images.ImageColumns.DATE_MODIFIED, dateSeconds)
+            values.put(MediaStore.Images.ImageColumns.MIME_TYPE, "image/png")
+            values.put(MediaStore.Images.ImageColumns.WIDTH, bitmap.width)
+            values.put(MediaStore.Images.ImageColumns.HEIGHT, bitmap.height)
+            values.put(MediaStore.Images.ImageColumns.SIZE, File(imageFilePath).length())
+            val imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+
+            // Create the intent to show the stylized image in gallery
+            val launchIntent = Intent(Intent.ACTION_VIEW)
+            launchIntent.setDataAndType(imageUri, "image/png")
+            launchIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+
+            val now = System.currentTimeMillis()
+
+            val mNotificationBuilder= NotificationCompat
+                .Builder(context, NotificationChannels.STYLIZES)
+                .setContentTitle("Stylized image saved")
+                .setContentText("Tap to view your stylized image")
+                .setContentIntent(PendingIntent.getActivity(context, 0, launchIntent, 0))
+                .setSmallIcon(R.drawable.ic_outline_image)
+                .setWhen(now)
+                .setShowWhen(true)
+                .setAutoCancel(true)
+
+            val nm: NotificationManager? = context.getSystemService()
+            nm?.notify(1, mNotificationBuilder.build())
         } catch (e: IOException) {
-            return false
+            Toast.makeText(context, "Failed!", Toast.LENGTH_SHORT).show()
         }
     }
 }
