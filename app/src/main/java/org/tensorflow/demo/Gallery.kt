@@ -48,7 +48,8 @@ object Gallery {
         val imageDate = SimpleDateFormat("yyyyMMdd-HHmmss").format(Date(imageTime))
         val imageFileName = String.format(FILE_NAME_TEMPLATE, imageDate)
 
-        val directory = File(Environment.getExternalStorageDirectory(), DIR_NAME)
+        val directory = File(Environment.getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_PICTURES), DIR_NAME)
         val imageFilePath = File(directory, imageFileName).absolutePath
 
         try {
