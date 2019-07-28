@@ -1,27 +1,12 @@
-/*
- * Copyright 2017 The TensorFlow Authors. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.tensorflow.demo
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Matrix
 import android.graphics.Rect
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
@@ -33,10 +18,9 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.ml.vision.common.FirebaseVisionImage
-import com.google.firebase.ml.vision.common.FirebaseVisionImageMetadata
+import com.otaliastudios.cameraview.CameraListener
 import com.otaliastudios.cameraview.CameraView
-import com.otaliastudios.cameraview.frame.Frame
-import timber.log.Timber
+import com.otaliastudios.cameraview.PictureResult
 import kotlin.math.max
 import kotlin.math.min
 
@@ -57,19 +41,14 @@ class StylizeActivity : AppCompatActivity() {
     // Start at a medium size, but let the user step up through smaller sizes so they don't get
     // immediately stuck processing a large image.
     private val SIZES = intArrayOf(128, 192, 256, 384, 512, 720)
-    private var initializedSize = 0
     private var desiredSize = SIZES[5]
     private var desiredSizeIndex = -1
-
-    private var croppedBitmap: Bitmap? = null
-
-    private var computing = false
-
-    private var frameToCropTransform: Matrix? = null
 
     private var lastOtherStyle = 1
 
     private var allZero = false
+
+    private var lastBitmap: Bitmap? = null
 
     private val gridTouchAdapter = object : OnTouchListener {
         private var slider: ImageSlider? = null
@@ -126,6 +105,10 @@ class StylizeActivity : AppCompatActivity() {
             desiredSize = SIZES[desiredSizeIndex]
             sizeButton.text = "$desiredSize"
         }
+
+        val captureButton: View = findViewById(R.id.captureButton)
+        captureButton.setOnClickListener {
+            cameraView.takePicture()
         }
 
         adapter = ImageGridAdapter(this, Styles.thumbnails)
@@ -179,16 +162,19 @@ class StylizeActivity : AppCompatActivity() {
 
     private fun bindCamera() {
         cameraView.setLifecycleOwner(this)
-        cameraView.addFrameProcessor { frame ->
-            if (computing) return@addFrameProcessor
-            computing = true
+        cameraView.addCameraListener(object : CameraListener() {
 
-            val stylizedImage = getStylizedImageFrom(frame)
-
-            computing = false
-
-            runOnUiThread { preview.setImageBitmap(stylizedImage) }
-        }
+            override fun onPictureTaken(result: PictureResult) {
+                super.onPictureTaken(result)
+                result.toBitmap {
+                    if (it != null) {
+                        lastBitmap = it
+                        val stylizedImage = getStylizedImageFrom(it)
+                        preview.setImageBitmap(stylizedImage)
+                    }
+                }
+            }
+        })
     }
 
     public override fun onDestroy() {
@@ -196,40 +182,42 @@ class StylizeActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun getStylizedImageFrom(frame: Frame): Bitmap {
-        val previewWidth = frame.size.width
-        val previewHeight = frame.size.height
-
-        if (desiredSize != initializedSize) {
-            Timber.i(
-                "Initializing at size preview size %dx%d, stylize size %d",
-                previewWidth, previewHeight, desiredSize
-            )
-            croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Bitmap.Config.ARGB_8888)
-
-            frameToCropTransform = ImageUtils.getTransformationMatrix(
-                previewWidth, previewHeight,
-                desiredSize, desiredSize,
-                0, true
-            )
-            initializedSize = desiredSize
-        }
-
+    private fun getStylizedImageFrom(uri: Uri): Bitmap {
         val bitmap = FirebaseVisionImage
-            .fromByteArray(
-                frame.data, FirebaseVisionImageMetadata.Builder()
-                    .setFormat(FirebaseVisionImageMetadata.IMAGE_FORMAT_NV21)
-                    .setWidth(frame.size.width)
-                    .setHeight(frame.size.height)
-                    .setRotation(FirebaseVisionImageMetadata.ROTATION_90)
-                    .build()
-            )
+            .fromFilePath(this, uri)
             .bitmap
 
-        val canvas = Canvas(croppedBitmap!!)
-        canvas.drawBitmap(bitmap, frameToCropTransform!!, null)
+        lastBitmap = bitmap
 
-        return stylize.stylize(croppedBitmap!!, desiredSize)
+        val previewWidth = bitmap.width
+        val previewHeight = bitmap.height
+
+        val frameToCropTransform = ImageUtils.getTransformationMatrix(
+            previewWidth, previewHeight,
+            desiredSize, desiredSize,
+            0, true
+        )
+        val croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(croppedBitmap)
+        canvas.drawBitmap(bitmap, frameToCropTransform, null)
+
+        return stylize.stylize(croppedBitmap, desiredSize)
+    }
+
+    private fun getStylizedImageFrom(bitmap: Bitmap): Bitmap {
+        val previewWidth = bitmap.width
+        val previewHeight = bitmap.height
+
+        val frameToCropTransform = ImageUtils.getTransformationMatrix(
+            previewWidth, previewHeight,
+            desiredSize, desiredSize,
+            0, true
+        )
+        val croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(croppedBitmap)
+        canvas.drawBitmap(bitmap, frameToCropTransform, null)
+
+        return stylize.stylize(croppedBitmap, desiredSize)
     }
 
     private fun setStyle(slider: ImageSlider, value: Float) {

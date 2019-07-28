@@ -12,6 +12,7 @@
         android:keepScreenOn="true"
         app:cameraAudio="off"
         app:cameraFacing="back"
+        app:cameraGestureTap="autoFocus"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -36,6 +37,14 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         tools:layout_height="300dp" />
+
+    <Button
+        android:id="@+id/captureButton"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:text="capture"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <Button
         android:id="@+id/sizeButton"
