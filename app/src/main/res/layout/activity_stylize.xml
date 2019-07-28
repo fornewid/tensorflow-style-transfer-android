@@ -139,6 +139,24 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <ImageView
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_arrow_up"
+            app:layout_constraintBottom_toBottomOf="@id/grid_title"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/grid_title" />
+
+        <ImageView
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_arrow_up"
+            app:layout_constraintBottom_toBottomOf="@id/grid_title"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/grid_title" />
+
         <GridView
             android:id="@+id/grid_layout"
             android:layout_width="match_parent"
