@@ -55,12 +55,12 @@ object Gallery {
         try {
             directory.mkdirs()
 
-            val dateSeconds = imageTime / 1000
-
             val out = FileOutputStream(imageFilePath)
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
             out.flush()
             out.close()
+
+            val dateSeconds = imageTime / 1000
 
             // Save the stylized image to the MediaStore
             val values = ContentValues()
