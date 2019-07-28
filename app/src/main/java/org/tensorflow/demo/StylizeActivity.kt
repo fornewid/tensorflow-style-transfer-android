@@ -51,6 +51,7 @@ class StylizeActivity : AppCompatActivity() {
     private var allZero = false
 
     private var lastBitmap: Bitmap? = null
+    private var lastStylizedBitmap: Bitmap? = null
 
     private val gridTouchAdapter = object : OnTouchListener {
 
@@ -139,6 +140,17 @@ class StylizeActivity : AppCompatActivity() {
             sizeButton.text = "$desiredSize"
         }
 
+        val saveButton: View = findViewById(R.id.saveButton)
+        saveButton.setOnClickListener {
+            lastStylizedBitmap?.let {
+                if (Gallery.saveBitmap(it)) {
+                    Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Failed!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
         adapter = ImageGridAdapter(this, Styles.thumbnails)
         val grid: GridView = findViewById(R.id.grid_layout)
         grid.adapter = adapter
@@ -215,6 +227,7 @@ class StylizeActivity : AppCompatActivity() {
     private fun updatePreview(bitmap: Bitmap) {
         WorkerHandler.execute {
             val stylizedImage = getStylizedImageFrom(bitmap)
+            lastStylizedBitmap = stylizedImage
             runOnUiThread {
                 preview.setImageBitmap(stylizedImage)
             }
