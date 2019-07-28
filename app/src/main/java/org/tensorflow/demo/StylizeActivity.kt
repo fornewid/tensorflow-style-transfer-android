@@ -1,12 +1,12 @@
 package org.tensorflow.demo
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
@@ -21,6 +21,7 @@ import com.google.firebase.ml.vision.common.FirebaseVisionImage
 import com.otaliastudios.cameraview.CameraListener
 import com.otaliastudios.cameraview.CameraView
 import com.otaliastudios.cameraview.PictureResult
+import com.otaliastudios.cameraview.internal.utils.WorkerHandler
 import kotlin.math.max
 import kotlin.math.min
 
@@ -51,61 +52,52 @@ class StylizeActivity : AppCompatActivity() {
     private var lastBitmap: Bitmap? = null
 
     private val gridTouchAdapter = object : OnTouchListener {
+
         private var slider: ImageSlider? = null
 
+        @SuppressLint("ClickableViewAccessibility")
         override fun onTouch(v: View, event: MotionEvent): Boolean {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN ->
-                    for (i in 0 until Styles.count) {
+                    (0 until Styles.count).forEach { i ->
                         val child = adapter.getItem(i)
                         val rect = Rect()
                         child.getHitRect(rect)
                         if (rect.contains(event.x.toInt(), event.y.toInt())) {
                             slider = child
-                            slider?.setHighlight(true)
+                            child.setHighlight(true)
                         }
                     }
 
-                MotionEvent.ACTION_MOVE ->
+                MotionEvent.ACTION_MOVE -> {
+                    val slider = this.slider
                     if (slider != null) {
                         val rect = Rect()
-                        slider?.getHitRect(rect)
+                        slider.getHitRect(rect)
 
                         val newSliderVal = min(
                             1.0,
-                            max(0.0, 1.0 - (event.y - slider!!.top) / slider!!.height)
+                            max(0.0, 1.0 - (event.y - slider.top) / slider.height)
                         ).toFloat()
 
-                        setStyle(slider!!, newSliderVal)
+                        setStyle(slider, newSliderVal)
                     }
+                }
 
-                MotionEvent.ACTION_UP ->
+                MotionEvent.ACTION_UP -> {
+                    val slider = this.slider
                     if (slider != null) {
-                        slider?.setHighlight(false)
-                        slider = null
-                        lastBitmap?.let {
-                            val stylizedImage = getStylizedImageFrom(it)
-                            runOnUiThread {
-                                preview.setImageBitmap(stylizedImage)
-                            }
-                        }
+                        slider.setHighlight(false)
+                        this.slider = null
+                        lastBitmap?.run(::updatePreview)
                     }
+                }
             }
             return true
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        Gallery.onPictureTaken(requestCode, resultCode, data) {
-            val stylizedImage = getStylizedImageFrom(it)
-            runOnUiThread {
-                preview.setImageBitmap(stylizedImage)
-            }
-        }
-    }
-
-    public override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_stylize)
 
@@ -137,7 +129,7 @@ class StylizeActivity : AppCompatActivity() {
         grid.adapter = adapter
         grid.setOnTouchListener(gridTouchAdapter)
 
-        setStyle(adapter.getItem(0), 1.0f)
+        setStyle(adapter.getItem(0), 1f)
 
         if (hasPermission()) {
             bindCamera()
@@ -171,13 +163,20 @@ class StylizeActivity : AppCompatActivity() {
     private fun requestPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (shouldShowRequestPermissionRationale(PERMISSION_CAMERA)) {
-                Toast.makeText(
-                    this,
-                    "Camera AND storage permission are required for this demo",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this, "Camera AND storage permission are required for this demo", Toast.LENGTH_LONG).show()
             }
             requestPermissions(arrayOf(PERMISSION_CAMERA), PERMISSIONS_REQUEST)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        Gallery.onPictureTaken(requestCode, resultCode, data) {
+            val bitmap = FirebaseVisionImage
+                .fromFilePath(this, it)
+                .bitmap
+
+            setPreview(bitmap)
         }
     }
 
@@ -188,41 +187,29 @@ class StylizeActivity : AppCompatActivity() {
             override fun onPictureTaken(result: PictureResult) {
                 super.onPictureTaken(result)
                 result.toBitmap {
-                    if (it != null) {
-                        lastBitmap = it
-                        val stylizedImage = getStylizedImageFrom(it)
-                        preview.setImageBitmap(stylizedImage)
-                    }
+                    it?.run(::setPreview)
                 }
             }
         })
     }
 
-    public override fun onDestroy() {
-        cameraView.clearFrameProcessors()
-        super.onDestroy()
+    private fun setPreview(bitmap: Bitmap) {
+        lastBitmap = bitmap
+        updatePreview(bitmap)
     }
 
-    private fun getStylizedImageFrom(uri: Uri): Bitmap {
-        val bitmap = FirebaseVisionImage
-            .fromFilePath(this, uri)
-            .bitmap
+    private fun updatePreview(bitmap: Bitmap) {
+        WorkerHandler.execute {
+            val stylizedImage = getStylizedImageFrom(bitmap)
+            runOnUiThread {
+                preview.setImageBitmap(stylizedImage)
+            }
+        }
+    }
 
-        lastBitmap = bitmap
-
-        val previewWidth = bitmap.width
-        val previewHeight = bitmap.height
-
-        val frameToCropTransform = ImageUtils.getTransformationMatrix(
-            previewWidth, previewHeight,
-            desiredSize, desiredSize,
-            0, true
-        )
-        val croppedBitmap = Bitmap.createBitmap(desiredSize, desiredSize, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(croppedBitmap)
-        canvas.drawBitmap(bitmap, frameToCropTransform, null)
-
-        return stylize.stylize(croppedBitmap, desiredSize)
+    override fun onDestroy() {
+        cameraView.clearFrameProcessors()
+        super.onDestroy()
     }
 
     private fun getStylizedImageFrom(bitmap: Bitmap): Bitmap {
@@ -266,7 +253,7 @@ class StylizeActivity : AppCompatActivity() {
                         continue
                     }
                     val newVal = child.value * factor
-                    child.value = if (newVal > 0.01f) newVal else 0.0f
+                    child.value = if (newVal > 0.01f) newVal else 0f
 
                     if (child.value > highestOtherVal) {
                         lastOtherStyle = i
