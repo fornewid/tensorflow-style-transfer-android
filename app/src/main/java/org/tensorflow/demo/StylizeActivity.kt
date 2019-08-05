@@ -15,7 +15,6 @@ import android.view.View.OnTouchListener
 import android.widget.GridView
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.ml.vision.common.FirebaseVisionImage
 import com.otaliastudios.cameraview.CameraListener
@@ -42,8 +41,8 @@ class StylizeActivity : AppCompatActivity() {
 
     // Start at a medium size, but let the user step up through smaller sizes so they don't get
     // immediately stuck processing a large image.
-    private val SIZES = intArrayOf(128, 192, 256, 384, 512, 720)
-    private var desiredSize = SIZES[5]
+    private val SIZES = intArrayOf(128, 192, 256, 384, 512, 720, 1440)
+    private var desiredSize = SIZES[7]
     private var desiredSizeIndex = -1
 
     private var lastOtherStyle = 1
